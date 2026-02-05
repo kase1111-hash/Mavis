@@ -2,68 +2,112 @@
 
 ## Project Summary
 
-Mavis is a vocal typing instrument that converts keyboard input with prosody markup ("Sheet Text") into singing via an LLM + TTS pipeline. It is a Python 3.8+ project currently at the proof-of-concept stage with no source code implemented yet -- only documentation (README.md, spec.md, LICENSE).
+Mavis is a vocal typing instrument that converts keyboard input with prosody markup ("Sheet Text") into singing via an LLM + TTS pipeline. It is a Python 3.8+ project. Phase 1 (Playable Alpha) is implemented with mock backends, a full pipeline, scoring, and two working demos.
 
 ## Repository Structure
 
 ```
 /
-├── README.md        # Full project description, concept, roadmap
-├── spec.md          # Technical specification (architecture, data models, components)
-├── LICENSE          # MIT License (Kase Branham, 2026)
-└── CLAUDE.md        # This file
+├── mavis/                        # Core Python package
+│   ├── __init__.py               # Package root, version = "0.1.0"
+│   ├── input_buffer.py           # Keystroke FIFO queue
+│   ├── sheet_text.py             # Sheet Text parser (markup -> tokens)
+│   ├── config.py                 # Hardware profiles and MavisConfig
+│   ├── llm_processor.py          # LLM phoneme processor (mock + stubs)
+│   ├── output_buffer.py          # Phoneme output buffer (game mechanic)
+│   ├── audio.py                  # Audio synthesis (mock + stubs)
+│   ├── pipeline.py               # Pipeline orchestrator (wires all components)
+│   ├── scoring.py                # Score tracker and grading
+│   └── songs.py                  # Song loader (JSON -> Song dataclass)
+├── tests/                        # pytest test suite (73 tests)
+│   ├── test_input_buffer.py
+│   ├── test_sheet_text.py
+│   ├── test_config.py
+│   ├── test_llm_processor.py
+│   ├── test_output_buffer.py
+│   ├── test_audio.py
+│   ├── test_pipeline.py
+│   ├── test_scoring.py
+│   └── test_songs.py
+├── demos/
+│   ├── vocal_typing_demo.py      # Non-interactive pipeline visualization
+│   └── interactive_vocal_typing.py  # Curses-based interactive typing demo
+├── songs/
+│   └── twinkle.json              # First playable song
+├── pyproject.toml                # Python packaging config
+├── .gitignore
+├── README.md
+├── spec.md
+├── EXECUTION_GUIDE.md
+├── LICENSE
+└── CLAUDE.md                     # This file
 ```
-
-No source code, tests, configs, or dependency files exist yet.
 
 ## Key Concepts
 
 - **Sheet Text**: Prosody markup notation embedded in typed text. CAPS = loud, `_underscores_` = soft, `...` = vibrato, `[brackets]` = harmony, ALL CAPS = shout.
-- **Pipeline**: Input Buffer -> LLM Phoneme Processor -> Output Buffer -> Audio Synthesis.
+- **Pipeline**: Input Buffer -> Sheet Text Parser -> LLM Phoneme Processor -> Output Buffer -> Audio Synthesis.
 - **Buffer management**: The core gameplay mechanic. Users control vocal output by managing typing speed and pause timing to keep the buffer in an optimal zone.
 - **Latency as gameplay**: The 600ms-1.5s processing delay is intentional -- users read ahead in the Sheet Text, absorbing latency through lookahead.
 
-## Tech Stack (Planned)
+## Tech Stack
 
 - **Language**: Python 3.8+
-- **LLM**: llama-cpp-python (local) or Anthropic Claude API (cloud)
-- **TTS**: espeak-ng (fast/free), Coqui TTS (quality/free), or ElevenLabs (premium)
-- **Interface**: Python/PyGame (native), Browser (web), or React Native (mobile)
+- **Packaging**: pyproject.toml with optional dependency groups
+- **LLM**: MockLLMProcessor (working), llama-cpp-python and Claude API (stubs)
+- **TTS**: MockAudioSynthesizer (sine waves, working), espeak-ng and Coqui (stubs)
+- **Interface**: curses (working terminal demo)
+- **Testing**: pytest (73 tests passing)
+
+## Development Commands
+
+```bash
+# Run all tests
+python3 -m pytest tests/ -v
+
+# Run the non-interactive pipeline demo
+python3 demos/vocal_typing_demo.py
+
+# Run the interactive typing demo
+python3 demos/interactive_vocal_typing.py
+
+# Run with a song loaded
+python3 demos/interactive_vocal_typing.py songs/twinkle.json
+
+# Import check
+python3 -c "import mavis; print(mavis.__version__)"
+```
 
 ## Development Guidelines
 
-- There is no build system, package manager config, or test suite yet. When creating these, prefer `pyproject.toml` for Python packaging.
-- Demo scripts should go in `demos/`. The README references `demos/vocal_typing_demo.py` and `demos/interactive_vocal_typing.py`.
+- Use `pyproject.toml` for all packaging config. Optional dependency groups: `dev`, `llm-local`, `llm-cloud`, `tts-coqui`, `web`.
+- Every module in `mavis/` must have a corresponding test file in `tests/`.
+- Follow the data models in `spec.md` Section 7 and the dataclasses in `mavis/llm_processor.py` and `mavis/output_buffer.py`.
+- Demo scripts live in `demos/`. Songs live in `songs/` as JSON files.
 - The README references `IMPLEMENTATION.md` and `CONTRIBUTING.md` which do not exist yet.
-- Follow the data models defined in `spec.md` (Section 7) for Sheet Text tokens, phoneme events, and buffer state.
 
-## Common Tasks
+## Adding a New Sheet Text Markup
 
-### Starting implementation
-1. Create a `mavis/` Python package directory.
-2. Set up `pyproject.toml` with Python 3.8+ requirement.
-3. Implement the pipeline components in order: input buffer, LLM processor, output buffer, audio synthesis.
-4. Create the demo scripts referenced in the README.
-
-### Adding a new Sheet Text markup
 1. Add the markup definition to the Sheet Text table in both `README.md` and `spec.md`.
-2. Update the input buffer parser to recognize the new token type.
-3. Update the LLM phoneme processor to handle the new prosody cue.
-4. Add corresponding audio synthesis behavior.
+2. Update the parser in `mavis/sheet_text.py` to recognize the new token pattern.
+3. Update `mavis/llm_processor.py` to map the new prosody cue to phoneme parameters.
+4. Add corresponding synthesis behavior in `mavis/audio.py`.
+5. Add tests for parsing and processing the new markup.
 
-### Running the project
-No runnable code exists yet. When demos are created:
-```bash
-python3 demos/vocal_typing_demo.py
-python3 demos/interactive_vocal_typing.py
-```
+## Adding a New Song
+
+1. Create a JSON file in `songs/` following the format of `twinkle.json`.
+2. Required fields: `title`, `bpm`, `difficulty`, `sheet_text`, `tokens`.
+3. Each token needs: `text`, `emphasis`, `sustain`, `harmony`, `duration_modifier`.
+4. Test with: `python3 -c "from mavis.songs import load_song; print(load_song('songs/yourfile.json'))"`.
 
 ## Architecture Notes
 
-- The input buffer must parse Sheet Text markup into structured tokens before sending to the LLM.
-- The LLM outputs timestamped phoneme events with prosody parameters (volume, pitch, vibrato, breathiness).
-- The output buffer manages drain rate vs fill rate; its level determines vocal quality (underflow = voice cracks, overflow = pitch strain).
-- Hardware capability determines buffer window size and effective difficulty.
+- `InputBuffer` uses `collections.deque(maxlen=capacity)` for O(1) push/consume with automatic overflow.
+- Sheet Text parser uses a two-pass approach: first pass groups chars into words and detects markup, second pass promotes consecutive "loud" tokens to "shout".
+- `MockLLMProcessor` uses a hardcoded English-to-phoneme dictionary (~50 words) with emphasis-to-prosody mapping.
+- `OutputBuffer` tracks fill/drain rates over a 2-second sliding window for real-time status display.
+- `MavisPipeline.tick()` runs the full cycle: consume input -> parse -> LLM -> buffer -> synthesize.
 
 ## Related Ecosystem
 
