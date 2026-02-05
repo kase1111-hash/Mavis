@@ -1,0 +1,18 @@
+{
+  "title": "Twinkle Twinkle Little Star",
+  "bpm": 90,
+  "difficulty": "easy",
+  "sheet_text": "TWINKLE twinkle _little_ STAR...\nhow I WONDER... what you ARE...",
+  "tokens": [
+    {"text": "TWINKLE", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "twinkle", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "little", "emphasis": "soft", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "STAR", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "how", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "I", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "WONDER", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "what", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "you", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "ARE", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0}
+  ]
+}
