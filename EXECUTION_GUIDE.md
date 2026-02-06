@@ -712,56 +712,28 @@ React Native application.
 
 Connect Mavis to the broader Natural Language Ecosystem projects.
 
-### Step 4.1 -- Prosody-Protocol Export
+### Step 4.1 -- Prosody-Protocol Export (IMPLEMENTED)
 
-**File:** `mavis/export.py`
+**File:** `mavis/export.py` -- **Already built during Phase 1.**
 
-Every performance generates data that maps typed text + prosody markup to phoneme events with timing. This data is valuable for training speech models.
+**Reference:** [Prosody-Protocol repo](https://github.com/kase1111-hash/Prosody-Protocol)
 
-**What to build:**
+Every performance generates data conforming to the Prosody-Protocol's IML specification and `dataset-entry.schema.json`. The export module (`mavis/export.py`) already provides:
 
-- Class `PerformanceRecorder`:
-  - Record every keystroke, token, phoneme event, and buffer state during a performance.
-  - Timestamps relative to song start.
-- Export format (aligned with prosody-protocol spec):
-  ```json
-  {
-    "version": "1.0",
-    "song_id": "twinkle",
-    "performer": "anonymous",
-    "timestamp": "2026-02-05T12:00:00Z",
-    "hardware_profile": "laptop_cpu",
-    "difficulty": "medium",
-    "events": [
-      {
-        "time_ms": 0,
-        "type": "keystroke",
-        "char": "T",
-        "modifiers": {"shift": true}
-      },
-      {
-        "time_ms": 50,
-        "type": "token",
-        "token": {"text": "TWINKLE", "emphasis": "loud", "sustain": false, "harmony": false}
-      },
-      {
-        "time_ms": 200,
-        "type": "phoneme",
-        "phoneme": {"phoneme": "t", "duration_ms": 80, "volume": 0.8, "pitch_hz": 220.0}
-      },
-      {
-        "time_ms": 200,
-        "type": "buffer_state",
-        "state": {"level": 0.45, "status": "optimal"}
-      }
-    ],
-    "score": 8500,
-    "grade": "A"
-  }
-  ```
-- Function `export_performance(recording, path: str)` -- Write JSON to file.
-- Function `export_batch(recordings: list, path: str)` -- Write multiple performances to JSONL for ML pipelines.
-- Opt-in consent: player must agree before any data is exported.
+- `PerformanceRecording` -- records keystrokes, tokens, phonemes, and buffer states with ms timestamps.
+- `tokens_to_iml()` / `phoneme_events_to_iml()` -- generate IML 1.0 XML with `<prosody>`, `<emphasis>`, `<pause>` tags.
+- `recording_to_dataset_entry()` -- produces dataset entry JSON with `source="mavis"`, IML markup, emotion label, consent flag.
+- `export_performance()` / `export_dataset()` -- write individual or batch entries to disk.
+- `extract_training_features()` -- 7-dim feature vector matching `MavisBridge.extract_training_features()`.
+- `infer_emotion()` -- heuristic emotion classification (neutral/angry/joyful/sad/calm).
+
+**Pipeline integration:** `MavisPipeline.start_recording()` / `stop_recording()` enable opt-in recording of full sessions.
+
+**Remaining work for Phase 4:**
+- Wire export into the interactive demo UI (export button / auto-export on song completion).
+- Add audio file generation alongside dataset entries (currently empty string).
+- Validate output against `prosody_protocol.IMLValidator` when the SDK is installed.
+- Bulk export to JSONL for ML training pipelines.
 
 ### Step 4.2 -- Intent-Engine Integration
 

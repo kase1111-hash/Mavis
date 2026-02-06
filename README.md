@@ -227,12 +227,14 @@ Your daily typing is already rhythmic, already practiced. This just makes it aud
 The game's difficulty slider becomes an accessibility tool - without stigma, without separate versions.
 
 ### For AI Researchers
-Every performance generates training data for **prosody ↔ text mapping**, which enables:
+Every performance generates training data for **prosody ↔ text mapping**, exported as [Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol) IML (Intent Markup Language) documents. This enables:
 - Better speech-to-text (that preserves emotional intent)
 - Better text-to-speech (that sounds human)
 - Better LLMs (that understand how you meant something, not just what you said)
 
-See: [`prosody-protocol`](https://github.com/yourusername/prosody-protocol) and [`intent-engine`](https://github.com/yourusername/intent-engine)
+Performance data is exported via `mavis/export.py` in the Prosody-Protocol dataset format (`dataset-entry.schema.json`), with IML markup, emotion labels, and 7-dimensional training feature vectors.
+
+See: [`Prosody-Protocol`](https://github.com/kase1111-hash/Prosody-Protocol) and [`intent-engine`](https://github.com/yourusername/intent-engine)
 
 ---
 
@@ -329,8 +331,8 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for guidelines.
 
 Part of the **Natural Language Ecosystem:**
 
-- **[prosody-protocol](https://github.com/yourusername/prosody-protocol)** - The markup language and training dataset
-- **[intent-engine](https://github.com/yourusername/intent-engine)** - Prosody-aware AI system
+- **[Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol)** - IML specification, JSON schemas, Python SDK, and training infrastructure. Mavis exports performance data to this format.
+- **[intent-engine](https://github.com/yourusername/intent-engine)** - Prosody-aware AI system (consumes IML from Prosody-Protocol)
 - **[Agent-OS](https://github.com/yourusername/agent-os)** - Constitutional AI governance (uses intent-engine)
 
 ---

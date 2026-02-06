@@ -228,17 +228,91 @@ Difficulty scaling (via buffer window size) doubles as an accessibility control 
 
 ---
 
-## 11. Related Projects
+## 11. Prosody-Protocol Integration
 
-| Project | Role |
-|---------|------|
-| prosody-protocol | Markup language and training dataset for prosody |
-| intent-engine | Prosody-aware AI system |
-| Agent-OS | Constitutional AI governance layer (uses intent-engine) |
+Mavis uses the [Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol) as its data interchange format. The protocol defines **IML (Intent Markup Language)**, an XML format for preserving prosodic intent alongside text.
+
+### 11.1 Data Flow
+
+```
+Keyboard -> Sheet Text -> PhonemeEvents -> IML XML + Dataset Entry JSON
+                                              |
+                                              v
+                                   Prosody-Protocol datasets/
+                                   (training data for ML models)
+```
+
+### 11.2 Sheet Text to IML Mapping
+
+| Sheet Text Markup | IML Tag | Attributes |
+|-------------------|---------|------------|
+| CAPS (loud) | `<prosody>` | `volume="+6dB" pitch="+10%"` |
+| `_soft_` | `<prosody>` | `volume="-6dB" quality="breathy"` |
+| ALL CAPS (shout) | `<prosody>` | `volume="+12dB" pitch="+20%" quality="tense"` |
+| CAPS/soft/shout | `<emphasis>` | `level="moderate"` / `"reduced"` / `"strong"` |
+| `...` (sustain) | `<pause>` | `duration="{ms}"` |
+
+### 11.3 Dataset Entry Format
+
+Each exported performance conforms to `dataset-entry.schema.json`:
+
+```json
+{
+  "id": "mavis_{session_id}",
+  "timestamp": "ISO-8601",
+  "source": "mavis",
+  "language": "en-US",
+  "audio_file": "",
+  "transcript": "the SUN rises",
+  "iml": "<iml version=\"1.0.0\" ...>...</iml>",
+  "emotion_label": "neutral",
+  "annotator": "model",
+  "consent": true,
+  "metadata": {
+    "song_id": "twinkle",
+    "hardware_profile": "Laptop (CPU)",
+    "score": 8500,
+    "grade": "A"
+  }
+}
+```
+
+### 11.4 Emotion Inference
+
+Emotion is inferred from aggregate prosody features using the same heuristic as the protocol's `MavisBridge`:
+
+| Condition | Emotion |
+|-----------|---------|
+| High volume + high pitch | `angry` |
+| High volume + normal/low pitch | `joyful` |
+| High breathiness | `sad` |
+| Low volume | `calm` |
+| Default | `neutral` |
+
+The 13 emotions supported by IML are: neutral, sincere, sarcastic, frustrated, joyful, uncertain, angry, sad, fearful, surprised, disgusted, calm, empathetic.
+
+### 11.5 Training Features
+
+`extract_training_features()` produces a 7-dimensional vector compatible with the protocol's `MavisBridge`:
+
+```
+[mean_pitch_hz, pitch_range_hz, mean_volume, volume_range,
+ mean_breathiness, speech_rate, vibrato_ratio]
+```
 
 ---
 
-## 12. Open Questions
+## 12. Related Projects
+
+| Project | Role | URL |
+|---------|------|-----|
+| Prosody-Protocol | IML spec, JSON schemas, SDK, training infra | https://github.com/kase1111-hash/Prosody-Protocol |
+| intent-engine | Prosody-aware AI system (consumes IML) | - |
+| Agent-OS | Constitutional AI governance (uses intent-engine) | - |
+
+---
+
+## 13. Open Questions
 
 - Final choice of local LLM model for Phase 1.
 - Phoneme set: full IPA vs. simplified subset for MVP.

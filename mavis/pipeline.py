@@ -1,9 +1,11 @@
 """Pipeline orchestrator -- wires all components into a single runnable pipeline."""
 
+import time
 from typing import Dict, List, Optional
 
 from mavis.audio import AudioSynthesizer, MockAudioSynthesizer
 from mavis.config import MavisConfig
+from mavis.export import PerformanceRecording
 from mavis.input_buffer import InputBuffer
 from mavis.llm_processor import (
     LLMProcessor,
@@ -19,6 +21,9 @@ class MavisPipeline:
 
     Call ``feed()`` to push keystrokes in, and ``tick()`` to advance the
     pipeline by one processing frame.
+
+    When ``recording`` is not None, all events (keystrokes, tokens, phonemes,
+    buffer states) are logged for later export to the Prosody-Protocol format.
     """
 
     def __init__(self, config: MavisConfig):
@@ -35,15 +40,49 @@ class MavisPipeline:
         # How many input chars to consume per tick
         self._chunk_size = 8
 
+        # Optional performance recording (for Prosody-Protocol export)
+        self.recording: Optional[PerformanceRecording] = None
+        self._start_time: Optional[float] = None
+
+    def start_recording(self, song_id: Optional[str] = None) -> PerformanceRecording:
+        """Begin recording a performance for Prosody-Protocol export.
+
+        Returns the PerformanceRecording instance being populated.
+        """
+        self.recording = PerformanceRecording(
+            song_id=song_id,
+            hardware_profile=self.config.hardware.name,
+            difficulty=self.config.hardware.difficulty,
+        )
+        self._start_time = time.monotonic()
+        return self.recording
+
+    def stop_recording(self) -> Optional[PerformanceRecording]:
+        """Stop recording and return the completed PerformanceRecording."""
+        rec = self.recording
+        self.recording = None
+        self._start_time = None
+        return rec
+
+    def _elapsed_ms(self) -> int:
+        """Milliseconds since recording started (or 0 if not recording)."""
+        if self._start_time is None:
+            return 0
+        return int((time.monotonic() - self._start_time) * 1000)
+
     def feed(self, char: str, modifiers: Optional[Dict[str, bool]] = None) -> None:
         """Push a single character into the input buffer."""
         self.input_buffer.push(char, modifiers)
+        if self.recording is not None:
+            self.recording.record_keystroke(
+                self._elapsed_ms(), char, modifiers or {}
+            )
 
     def feed_text(self, text: str) -> None:
         """Convenience: push an entire string, inferring shift from case."""
         for c in text:
             mods = {"shift": c.isupper(), "ctrl": False, "alt": False}
-            self.input_buffer.push(c, mods)
+            self.feed(c, mods)
 
     def tick(self, elapsed_ms: int = 33) -> Dict:
         """Advance the pipeline by one frame.
@@ -63,6 +102,10 @@ class MavisPipeline:
         tokens = parse(chars) if chars else []
         if tokens:
             self._last_tokens = tokens
+            if self.recording is not None:
+                now = self._elapsed_ms()
+                for tok in tokens:
+                    self.recording.record_token(now, tok)
 
         # Step 3: LLM processing
         events: List[PhonemeEvent] = []
@@ -78,8 +121,16 @@ class MavisPipeline:
         if self._last_phoneme is not None:
             self._last_audio = self.audio.synthesize(self._last_phoneme)
             self.audio.play(self._last_audio)
+            if self.recording is not None:
+                self.recording.record_phoneme(self._elapsed_ms(), self._last_phoneme)
         else:
             self._last_audio = None
+
+        # Record buffer state
+        if self.recording is not None:
+            self.recording.record_buffer_state(
+                self._elapsed_ms(), self.output_buffer.state()
+            )
 
         return self.state()
 
