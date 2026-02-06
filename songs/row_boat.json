@@ -1,0 +1,26 @@
+{
+  "title": "Row Row Row Your Boat",
+  "bpm": 95,
+  "difficulty": "easy",
+  "sheet_text": "ROW... ROW... ROW... your BOAT...\n_gently_ down the STREAM...\nMERRILY merrily MERRILY merrily\nLIFE is but a DREAM...",
+  "tokens": [
+    {"text": "ROW", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "ROW", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "ROW", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "your", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "BOAT", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "gently", "emphasis": "soft", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "down", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "the", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "STREAM", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "MERRILY", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "merrily", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "MERRILY", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "merrily", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "LIFE", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "is", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "but", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "a", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "DREAM", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0}
+  ]
+}

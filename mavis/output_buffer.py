@@ -31,8 +31,15 @@ class OutputBuffer:
         level > 0.8 -> overflow
     """
 
-    def __init__(self, capacity: int = 128):
+    def __init__(
+        self,
+        capacity: int = 128,
+        low_threshold: float = 0.2,
+        high_threshold: float = 0.8,
+    ):
         self.capacity = capacity
+        self.low_threshold = low_threshold
+        self.high_threshold = high_threshold
         self._buffer: deque = deque()
         self._push_times: List[float] = []
         self._pop_times: List[float] = []
@@ -57,9 +64,9 @@ class OutputBuffer:
         """Return current buffer state with fill level and rates."""
         level = len(self._buffer) / self.capacity if self.capacity > 0 else 0.0
 
-        if level < 0.2:
+        if level < self.low_threshold:
             status = "underflow"
-        elif level > 0.8:
+        elif level > self.high_threshold:
             status = "overflow"
         else:
             status = "optimal"

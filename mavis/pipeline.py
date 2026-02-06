@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 
 from mavis.audio import AudioSynthesizer, MockAudioSynthesizer
 from mavis.config import MavisConfig
+from mavis.difficulty import DifficultySettings, get_difficulty
 from mavis.export import PerformanceRecording
 from mavis.input_buffer import InputBuffer
 from mavis.llm_processor import (
@@ -14,6 +15,7 @@ from mavis.llm_processor import (
 )
 from mavis.output_buffer import OutputBuffer
 from mavis.sheet_text import SheetTextToken, parse
+from mavis.voice import VoiceProfile, get_voice
 
 
 class MavisPipeline:
@@ -28,8 +30,29 @@ class MavisPipeline:
 
     def __init__(self, config: MavisConfig):
         self.config = config
-        self.input_buffer = InputBuffer(capacity=config.input_buffer_capacity)
-        self.output_buffer = OutputBuffer(capacity=config.output_buffer_capacity)
+
+        # Apply difficulty settings if specified
+        self.difficulty: Optional[DifficultySettings] = None
+        input_cap = config.input_buffer_capacity
+        output_cap = config.output_buffer_capacity
+        if config.difficulty_name is not None:
+            self.difficulty = get_difficulty(config.difficulty_name)
+            input_cap = self.difficulty.input_buffer_capacity
+            output_cap = self.difficulty.output_buffer_capacity
+
+        # Apply voice profile if specified
+        self.voice: Optional[VoiceProfile] = None
+        if config.voice_name is not None:
+            self.voice = get_voice(config.voice_name)
+
+        self.input_buffer = InputBuffer(capacity=input_cap)
+
+        # Build output buffer with difficulty-specific thresholds
+        ob_kwargs = {"capacity": output_cap}
+        if self.difficulty is not None:
+            ob_kwargs["low_threshold"] = self.difficulty.optimal_zone_low
+            ob_kwargs["high_threshold"] = self.difficulty.optimal_zone_high
+        self.output_buffer = OutputBuffer(**ob_kwargs)
         self.llm: LLMProcessor = _create_llm(config.llm_backend)
         self.audio: AudioSynthesizer = _create_audio(config.tts_backend)
 
@@ -49,10 +72,13 @@ class MavisPipeline:
 
         Returns the PerformanceRecording instance being populated.
         """
+        diff_name = self.config.hardware.difficulty
+        if self.difficulty is not None:
+            diff_name = self.difficulty.name.lower()
         self.recording = PerformanceRecording(
             song_id=song_id,
             hardware_profile=self.config.hardware.name,
-            difficulty=self.config.hardware.difficulty,
+            difficulty=diff_name,
         )
         self._start_time = time.monotonic()
         return self.recording
@@ -112,6 +138,10 @@ class MavisPipeline:
         if tokens:
             events = self.llm.process(tokens)
 
+        # Step 3.5: Apply voice profile to phoneme events
+        if events and self.voice is not None:
+            events = [_apply_voice(ev, self.voice) for ev in events]
+
         # Step 4: Push to output buffer
         if events:
             self.output_buffer.push(events)
@@ -160,6 +190,20 @@ def _create_audio(backend: str) -> AudioSynthesizer:
     if backend == "mock":
         return MockAudioSynthesizer()
     raise ValueError(f"Unknown TTS backend: {backend!r}")
+
+
+def _apply_voice(event: PhonemeEvent, voice: VoiceProfile) -> PhonemeEvent:
+    """Apply voice profile adjustments to a PhonemeEvent."""
+    return PhonemeEvent(
+        phoneme=event.phoneme,
+        start_ms=event.start_ms,
+        duration_ms=event.duration_ms,
+        volume=min(1.0, event.volume * voice.volume_scale),
+        pitch_hz=event.pitch_hz * (voice.base_pitch_hz / 220.0),
+        vibrato=event.vibrato,
+        breathiness=max(event.breathiness, voice.breathiness),
+        harmony_intervals=list(event.harmony_intervals),
+    )
 
 
 def create_pipeline(config: Optional[MavisConfig] = None) -> MavisPipeline:

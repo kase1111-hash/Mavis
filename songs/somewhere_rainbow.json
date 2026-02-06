@@ -1,0 +1,28 @@
+{
+  "title": "Somewhere Over the Rainbow",
+  "bpm": 80,
+  "difficulty": "medium",
+  "sheet_text": "_some_... WHERE... OVER the RAIN... BOW...\nWAY up HIGH...\nthere's a LAND that I _heard_ of\nONCE in a _lullaby_...",
+  "tokens": [
+    {"text": "some", "emphasis": "soft", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "WHERE", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 3.0},
+    {"text": "OVER", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "the", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "RAIN", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.5},
+    {"text": "BOW", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 3.0},
+    {"text": "WAY", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "up", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "HIGH", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 3.0},
+    {"text": "there's", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "a", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "LAND", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "that", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "I", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "heard", "emphasis": "soft", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "of", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "ONCE", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "in", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "a", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "lullaby", "emphasis": "soft", "sustain": true, "harmony": false, "duration_modifier": 3.0}
+  ]
+}

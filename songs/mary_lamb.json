@@ -1,0 +1,28 @@
+{
+  "title": "Mary Had a Little Lamb",
+  "bpm": 100,
+  "difficulty": "easy",
+  "sheet_text": "MARY had a _little_ LAMB...\n_little_ LAMB... _little_ LAMB...\nMARY had a _little_ LAMB...\nits FLEECE was WHITE as SNOW...",
+  "tokens": [
+    {"text": "MARY", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "had", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "a", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "little", "emphasis": "soft", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "LAMB", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "little", "emphasis": "soft", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "LAMB", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "little", "emphasis": "soft", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "LAMB", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "MARY", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "had", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "a", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "little", "emphasis": "soft", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "LAMB", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0},
+    {"text": "its", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "FLEECE", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "was", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "WHITE", "emphasis": "loud", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "as", "emphasis": "none", "sustain": false, "harmony": false, "duration_modifier": 1.0},
+    {"text": "SNOW", "emphasis": "loud", "sustain": true, "harmony": false, "duration_modifier": 2.0}
+  ]
+}
