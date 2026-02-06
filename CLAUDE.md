@@ -2,7 +2,7 @@
 
 ## Project Summary
 
-Mavis is a vocal typing instrument that converts keyboard input with prosody markup ("Sheet Text") into singing via an LLM + TTS pipeline. It is a Python 3.8+ project. Phases 1 (Playable Alpha), 2 (Game Polish), and 3 (Platform Launch) are implemented with mock backends, a full pipeline, scoring, 10-song library, difficulty levels, leaderboards, voice customization, tutorial mode, web interface (FastAPI + WebSocket), mobile client (React Native), cloud save, multiplayer, and user-generated content. Performance data exports to the [Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol) IML format.
+Mavis is a vocal typing instrument that converts keyboard input with prosody markup ("Sheet Text") into singing via an LLM + TTS pipeline. It is a Python 3.8+ project. Phases 1 (Playable Alpha), 2 (Game Polish), 3 (Platform Launch), and 4 (Ecosystem Integration) are implemented with mock backends, a full pipeline, scoring, 10-song library, difficulty levels, leaderboards, voice customization, tutorial mode, web interface (FastAPI + WebSocket), mobile client (React Native), cloud save, multiplayer, user-generated content, intent-engine integration, researcher API, and institutional licensing. Performance data exports to the [Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol) IML format.
 
 ## Repository Structure
 
@@ -27,7 +27,10 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │   ├── tutorial.py               # 7-lesson tutorial with progress tracking (Phase 2)
 │   ├── cloud.py                  # User accounts, auth, cloud sync (Phase 3)
 │   ├── multiplayer.py            # Rooms, players, duet splitting (Phase 3)
-│   └── song_editor.py            # Song creation, validation, community library (Phase 3)
+│   ├── song_editor.py            # Song creation, validation, community library (Phase 3)
+│   ├── intent_bridge.py          # Intent-engine prosody analysis bridge (Phase 4)
+│   ├── researcher_api.py         # Anonymized performance data API (Phase 4)
+│   └── licensing.py              # License tiers, key validation, feature gating (Phase 4)
 ├── web/                          # FastAPI web interface (Phase 3)
 │   ├── __init__.py
 │   ├── server.py                 # REST API + WebSocket gameplay + auth + UGC endpoints
@@ -43,7 +46,7 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │       ├── BufferDisplay.js      # Buffer bar components
 │       ├── SheetTextView.js      # Song text display
 │       └── AudioPlayer.js        # Audio playback stub
-├── tests/                        # pytest test suite (211 tests)
+├── tests/                        # pytest test suite (281 tests)
 │   ├── test_input_buffer.py
 │   ├── test_sheet_text.py
 │   ├── test_config.py
@@ -61,7 +64,11 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │   ├── test_tutorial.py
 │   ├── test_cloud.py
 │   ├── test_multiplayer.py
-│   └── test_song_editor.py
+│   ├── test_song_editor.py
+│   ├── test_export_phase4.py
+│   ├── test_intent_bridge.py
+│   ├── test_researcher_api.py
+│   └── test_licensing.py
 ├── demos/
 │   ├── vocal_typing_demo.py      # Non-interactive pipeline visualization
 │   └── interactive_vocal_typing.py  # Curses-based interactive demo with menus
@@ -172,6 +179,44 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 - `rate(entry_id, 1-5)` for star ratings; `flag(entry_id)` for moderation (auto-hides at 3 flags).
 - Sort options: `rating`, `newest`, `title`.
 
+## Phase 4 Modules
+
+### Enhanced Export (`mavis/export.py` additions)
+- `export_dataset_jsonl()`: bulk export to JSONL for ML training pipelines, consent-gated.
+- `generate_audio_for_recording()`: generate WAV audio files from performance phoneme events.
+- `validate_iml()`: validate IML XML strings with structural checks; delegates to SDK `IMLValidator` when installed.
+- `_write_wav()`: write raw PCM data as 16-bit mono WAV files.
+
+### Intent-Engine Bridge (`mavis/intent_bridge.py`)
+- `IntentBridge`: connects to the intent-engine REST API for prosody-aware analysis.
+- Falls back to local heuristic analysis when the service is unavailable.
+- `analyze()` / `analyze_recording()`: returns dominant_emotion, energy_curve, intent_confidence, coaching_suggestions.
+- `get_feedback()`: generates human-readable feedback text from analysis results.
+- `get_coaching()`: extracts coaching suggestions (dynamic contrast, sustain usage, energy building).
+- Local analysis detects "triumphant" pattern (rising energy ending loud) beyond the 5 basic emotions.
+- `_compute_energy_curve()`: segments volume over time into N segments for visualization.
+
+### Researcher API (`mavis/researcher_api.py`)
+- `AnonymizedPerformance`: stripped of player names and raw keystrokes; retains tokens, phonemes, IML, features.
+- `PerformanceStore`: JSON-backed storage at `~/.mavis/performances.json`.
+  - `record()` / `get()` / `query()` with filtering by song_id, difficulty, min_score, pagination.
+  - `statistics()`: aggregate stats (total, averages by song, difficulty/emotion distributions).
+  - `prosody_map()`: average feature vectors grouped by emotion label.
+- `APIKeyStore`: manages researcher API keys with SHA-256 hashing.
+  - `register()` returns plaintext key; `validate()` checks hash.
+  - `check_rate_limit()`: sliding window (1 minute), 100 requests/minute default.
+  - `revoke()` / `list_keys()` for key management.
+- Web endpoints: `POST /api/v1/register`, `GET /api/v1/performances`, `GET /api/v1/performances/{id}`, `GET /api/v1/statistics`, `GET /api/v1/prosody-map`.
+
+### Institutional Licensing (`mavis/licensing.py`)
+- 3 tiers: Free (personal, local only), Institutional (cloud, multiplayer, researcher API), Research (bulk export, admin dashboard).
+- `generate_license_key()` / `validate_license_key()`: HMAC-SHA256 signed keys with tier, institution, expiry.
+- `LicenseInfo`: tracks tier, expiry, activation, offline grace period (7 days).
+  - `is_active()` / `has_feature()` / `to_dict()` for feature gating.
+- `LicenseManager`: JSON persistence at `~/.mavis/license.json`.
+  - `activate()` / `deactivate()` / `check_online()` / `list_features()` / `usage_report()`.
+- Web endpoints: `GET /api/license/tiers`, `GET /api/license/current`, `POST /api/license/activate`, `POST /api/license/deactivate`.
+
 ## Prosody-Protocol Integration
 
 Mavis is a **data source** for the [Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol) ecosystem. Every performance session can be recorded and exported as:
@@ -236,7 +281,7 @@ Install with `pip install prosody-protocol` or `pip install mavis[prosody]`. Whe
 - **Mobile**: React Native thin client
 - **Interface**: curses (working terminal demo with menus)
 - **Data format**: Prosody-Protocol IML 1.0 (XML) + dataset-entry JSON schema
-- **Testing**: pytest (211 tests passing)
+- **Testing**: pytest (281 tests passing)
 
 ## Development Commands
 
