@@ -79,9 +79,9 @@ def test_validate_key():
 def test_validate_key_wrong_signature():
     key = generate_license_key("institutional", "MIT", _future_date())
     # Tamper with the signature
-    parts = key.split(":")
+    parts = key.split("|")
     parts[-1] = "0000000000000000"
-    tampered = ":".join(parts)
+    tampered = "|".join(parts)
     assert validate_license_key(tampered) is None
 
 
