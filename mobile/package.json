@@ -1,0 +1,22 @@
+{
+  "name": "mavis-mobile",
+  "version": "0.1.0",
+  "description": "Mavis - Vocal Typing Instrument (React Native Mobile Client)",
+  "main": "App.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "expo": "~49.0.0",
+    "react": "18.2.0",
+    "react-native": "0.72.0",
+    "react-native-gesture-handler": "~2.12.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0"
+  },
+  "private": true
+}

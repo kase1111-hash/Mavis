@@ -2,7 +2,7 @@
 
 ## Project Summary
 
-Mavis is a vocal typing instrument that converts keyboard input with prosody markup ("Sheet Text") into singing via an LLM + TTS pipeline. It is a Python 3.8+ project. Phase 1 (Playable Alpha) and Phase 2 (Game Polish) are implemented with mock backends, a full pipeline, scoring, 10-song library, difficulty levels, leaderboards, voice customization, tutorial mode, and two working demos. Performance data exports to the [Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol) IML format.
+Mavis is a vocal typing instrument that converts keyboard input with prosody markup ("Sheet Text") into singing via an LLM + TTS pipeline. It is a Python 3.8+ project. Phases 1 (Playable Alpha), 2 (Game Polish), and 3 (Platform Launch) are implemented with mock backends, a full pipeline, scoring, 10-song library, difficulty levels, leaderboards, voice customization, tutorial mode, web interface (FastAPI + WebSocket), mobile client (React Native), cloud save, multiplayer, and user-generated content. Performance data exports to the [Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol) IML format.
 
 ## Repository Structure
 
@@ -24,8 +24,26 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │   ├── difficulty.py             # Difficulty presets and settings (Phase 2)
 │   ├── leaderboard.py            # Local JSON leaderboard storage (Phase 2)
 │   ├── voice.py                  # Voice profile presets and persistence (Phase 2)
-│   └── tutorial.py               # 7-lesson tutorial with progress tracking (Phase 2)
-├── tests/                        # pytest test suite (152 tests)
+│   ├── tutorial.py               # 7-lesson tutorial with progress tracking (Phase 2)
+│   ├── cloud.py                  # User accounts, auth, cloud sync (Phase 3)
+│   ├── multiplayer.py            # Rooms, players, duet splitting (Phase 3)
+│   └── song_editor.py            # Song creation, validation, community library (Phase 3)
+├── web/                          # FastAPI web interface (Phase 3)
+│   ├── __init__.py
+│   ├── server.py                 # REST API + WebSocket gameplay + auth + UGC endpoints
+│   └── static/
+│       ├── index.html            # Single-page app (7 screens)
+│       ├── app.js                # WebSocket client with keyboard capture
+│       └── style.css             # Dark theme UI
+├── mobile/                       # React Native mobile client (Phase 3)
+│   ├── package.json
+│   ├── App.js                    # Main component with screens
+│   └── src/
+│       ├── WebSocketClient.js    # WebSocket connection wrapper
+│       ├── BufferDisplay.js      # Buffer bar components
+│       ├── SheetTextView.js      # Song text display
+│       └── AudioPlayer.js        # Audio playback stub
+├── tests/                        # pytest test suite (211 tests)
 │   ├── test_input_buffer.py
 │   ├── test_sheet_text.py
 │   ├── test_config.py
@@ -40,7 +58,10 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │   ├── test_difficulty.py
 │   ├── test_leaderboard.py
 │   ├── test_voice.py
-│   └── test_tutorial.py
+│   ├── test_tutorial.py
+│   ├── test_cloud.py
+│   ├── test_multiplayer.py
+│   └── test_song_editor.py
 ├── demos/
 │   ├── vocal_typing_demo.py      # Non-interactive pipeline visualization
 │   └── interactive_vocal_typing.py  # Curses-based interactive demo with menus
@@ -103,6 +124,54 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 - Tutorial menu with lesson selection.
 - Results screen with automatic leaderboard submission.
 
+## Phase 3 Modules
+
+### Web Version (`web/server.py` + `web/static/`)
+- **FastAPI backend** with REST API and WebSocket gameplay.
+- `GameSession` wraps `MavisPipeline` + `ScoreTracker` for per-client state.
+- WebSocket `/ws/play`: real-time gameplay (start/key/tick/stop protocol).
+- WebSocket `/ws/room/{room_id}`: multiplayer room with opponent state broadcasts.
+- REST endpoints: `GET /api/songs`, `GET /api/leaderboard/{song_id}`, `POST /api/leaderboard/{song_id}`.
+- Auth endpoints: `POST /auth/register`, `POST /auth/login`, `GET /api/profile`, `PUT /api/progress`.
+- UGC endpoints: `POST /api/songs/upload`, `GET /api/songs/community`, `POST /api/songs/{id}/rate`, `POST /api/songs/{id}/flag`.
+- **Static frontend**: single-page app with 7 screens (menu, song browser, game, results, leaderboard, settings, multiplayer). Dark theme, monospace design.
+- Run with: `uvicorn web.server:app --reload` (requires `pip install mavis[web]`).
+
+### Mobile Client (`mobile/`)
+- **React Native** thin client connecting to the same FastAPI backend.
+- `App.js`: screens for menu, settings, song browser, game, results.
+- `WebSocketClient.js`: connection lifecycle and JSON serialization.
+- `BufferDisplay.js`: color-coded input/output buffer bars.
+- `SheetTextView.js`: monospace Sheet Text display.
+- `AudioPlayer.js`: stub for future client-side audio.
+- Touch gesture mapping: tap=keypress, long press=sustain, swipe up=CAPS, swipe down=soft, two-finger=harmony.
+
+### Cloud Save (`mavis/cloud.py`)
+- `UserProfile` dataclass with preferences, tutorial progress, personal bests.
+- `UserStore`: JSON-file-backed user storage at `~/.mavis/users.json`.
+- `register()` / `authenticate()` with salted SHA-256 password hashing.
+- `generate_token()` / `verify_token()` for session authentication (HMAC-style with expiry).
+- `SyncPayload` + `sync()` for offline-first data merge: last-write-wins for preferences, max-score-wins for bests, no grade downgrade for tutorial.
+- Production path: swap to bcrypt + JWT + SQLAlchemy (optional deps in `cloud` group).
+
+### Multiplayer (`mavis/multiplayer.py`)
+- `Room`: holds up to 2 players with separate pipelines and score trackers.
+- `Player`: wraps pipeline + tracker, provides `feed_char()`, `tick_idle()`, `result()`.
+- `RoomManager`: create, look up, remove, and clean up rooms.
+- `DuetSplitter`: splits songs for duet mode.
+  - `split(song)`: harmony lines to player 2, alternating phrases otherwise.
+  - `split_tokens(tokens)`: harmony tokens to player 2, non-harmony alternated.
+- Modes: `competitive` (same song, highest score wins) and `duet` (split parts).
+- `get_winner()` returns winner name or None for ties.
+
+### User-Generated Content (`mavis/song_editor.py`)
+- `SongDraft`: create and validate songs (title, bpm 40-300, difficulty, sheet text max 5000 chars).
+- `validate()` returns error list; `to_song()` parses Sheet Text into tokens; `to_json()` / `save()` for export.
+- `CommunityLibrary`: JSON-backed storage at `~/.mavis/community.json`.
+- `submit(draft)` adds songs; `browse(sort_by, difficulty, limit, offset)` for paginated browsing.
+- `rate(entry_id, 1-5)` for star ratings; `flag(entry_id)` for moderation (auto-hides at 3 flags).
+- Sort options: `rating`, `newest`, `title`.
+
 ## Prosody-Protocol Integration
 
 Mavis is a **data source** for the [Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol) ecosystem. Every performance session can be recorded and exported as:
@@ -163,9 +232,11 @@ Install with `pip install prosody-protocol` or `pip install mavis[prosody]`. Whe
 - **Packaging**: pyproject.toml with optional dependency groups
 - **LLM**: MockLLMProcessor (working), llama-cpp-python and Claude API (stubs)
 - **TTS**: MockAudioSynthesizer (sine waves, working), espeak-ng and Coqui (stubs)
+- **Web**: FastAPI + WebSocket (real-time gameplay), static HTML/JS frontend
+- **Mobile**: React Native thin client
 - **Interface**: curses (working terminal demo with menus)
 - **Data format**: Prosody-Protocol IML 1.0 (XML) + dataset-entry JSON schema
-- **Testing**: pytest (152 tests passing)
+- **Testing**: pytest (211 tests passing)
 
 ## Development Commands
 
@@ -193,11 +264,16 @@ python3 -c "from mavis.song_browser import browse_songs, format_song_list; print
 
 # List difficulty presets
 python3 -c "from mavis.difficulty import list_difficulties; [print(f'{d.name}: {d.description}') for d in list_difficulties()]"
+
+# Run the web server (requires fastapi, uvicorn)
+pip install fastapi uvicorn websockets
+uvicorn web.server:app --reload --port 8000
+# Then open http://localhost:8000 in a browser
 ```
 
 ## Development Guidelines
 
-- Use `pyproject.toml` for all packaging config. Optional dependency groups: `dev`, `llm-local`, `llm-cloud`, `tts-coqui`, `web`, `prosody`.
+- Use `pyproject.toml` for all packaging config. Optional dependency groups: `dev`, `llm-local`, `llm-cloud`, `tts-coqui`, `web`, `cloud`, `prosody`.
 - Every module in `mavis/` must have a corresponding test file in `tests/`.
 - Follow the data models in `spec.md` Section 7 and the dataclasses in `mavis/llm_processor.py` and `mavis/output_buffer.py`.
 - Demo scripts live in `demos/`. Songs live in `songs/` as JSON files.

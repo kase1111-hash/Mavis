@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mavis - Vocal Typing Instrument</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Main Menu -->
+        <div id="menu-screen" class="screen active">
+            <h1>Mavis</h1>
+            <p class="subtitle">Turn typing into singing. Your keyboard is the instrument.</p>
+            <div class="menu-buttons">
+                <button onclick="showSongBrowser()">Play a Song</button>
+                <button onclick="showMultiplayer()">Multiplayer</button>
+                <button onclick="showLeaderboard()">Leaderboard</button>
+                <button onclick="showSettings()">Settings</button>
+            </div>
+        </div>
+
+        <!-- Song Browser -->
+        <div id="song-browser" class="screen">
+            <h2>Select a Song</h2>
+            <div class="difficulty-filter">
+                <button class="filter-btn active" onclick="filterSongs(null)">All</button>
+                <button class="filter-btn" onclick="filterSongs('easy')">Easy</button>
+                <button class="filter-btn" onclick="filterSongs('medium')">Medium</button>
+                <button class="filter-btn" onclick="filterSongs('hard')">Hard</button>
+            </div>
+            <div id="song-list"></div>
+            <button class="back-btn" onclick="showMenu()">Back</button>
+        </div>
+
+        <!-- Gameplay Screen -->
+        <div id="game-screen" class="screen">
+            <div class="game-header">
+                <h2 id="game-title"></h2>
+                <div class="game-stats">
+                    <span>Score: <strong id="game-score">0</strong></span>
+                    <span>Grade: <strong id="game-grade">F</strong></span>
+                </div>
+            </div>
+
+            <div id="sheet-text-display" class="sheet-text"></div>
+
+            <div class="buffers">
+                <div class="buffer-row">
+                    <label>IN</label>
+                    <div class="buffer-bar">
+                        <div id="input-bar" class="bar-fill"></div>
+                    </div>
+                    <span id="input-pct">0%</span>
+                </div>
+                <div class="buffer-row">
+                    <label>OUT</label>
+                    <div class="buffer-bar">
+                        <div id="output-bar" class="bar-fill"></div>
+                    </div>
+                    <span id="output-pct">0%</span>
+                    <span id="output-status" class="status-badge">underflow</span>
+                </div>
+            </div>
+
+            <div class="phoneme-display">
+                <span>Phoneme: <strong id="current-phoneme">-</strong></span>
+                <span>Tokens: <strong id="current-tokens">-</strong></span>
+            </div>
+
+            <div class="typed-area">
+                <label>Your input:</label>
+                <div id="typed-text" class="typed-text"></div>
+            </div>
+
+            <div class="game-controls">
+                <button onclick="stopGame()">End Performance (Esc)</button>
+            </div>
+
+            <p class="hint">Type to sing! CAPS=loud &nbsp; _word_=soft &nbsp; ...=sustain &nbsp; [word]=harmony</p>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="results-screen" class="screen">
+            <h2>Performance Complete!</h2>
+            <div id="results-content"></div>
+            <div class="result-actions">
+                <button onclick="showSongBrowser()">Play Again</button>
+                <button onclick="showMenu()">Main Menu</button>
+            </div>
+        </div>
+
+        <!-- Leaderboard Screen -->
+        <div id="leaderboard-screen" class="screen">
+            <h2>Leaderboard</h2>
+            <div id="leaderboard-content"></div>
+            <button class="back-btn" onclick="showMenu()">Back</button>
+        </div>
+
+        <!-- Settings Screen -->
+        <div id="settings-screen" class="screen">
+            <h2>Settings</h2>
+            <div class="setting-group">
+                <label>Difficulty:</label>
+                <select id="difficulty-select">
+                    <option value="easy">Easy - Wide buffer zone, gentle penalties</option>
+                    <option value="medium" selected>Medium - Standard experience</option>
+                    <option value="hard">Hard - Narrow zone, harsh penalties</option>
+                    <option value="expert">Expert - Razor-thin zone, for virtuosos</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label>Voice:</label>
+                <select id="voice-select">
+                    <option value="default">Default (220 Hz)</option>
+                    <option value="alto">Alto - Warm lower register</option>
+                    <option value="soprano">Soprano - Bright higher register</option>
+                    <option value="bass">Bass - Deep lower register</option>
+                    <option value="whisper">Whisper - Soft, breathy</option>
+                    <option value="robot">Robot - Flat, mechanical</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label>Player Name:</label>
+                <input type="text" id="player-name" value="Player" maxlength="12">
+            </div>
+            <button class="back-btn" onclick="showMenu()">Back</button>
+        </div>
+
+        <!-- Multiplayer Screen -->
+        <div id="multiplayer-screen" class="screen">
+            <h2>Multiplayer</h2>
+            <div class="mp-options">
+                <div class="mp-create">
+                    <h3>Create Room</h3>
+                    <select id="mp-mode">
+                        <option value="competitive">Competitive</option>
+                        <option value="duet">Duet</option>
+                    </select>
+                    <select id="mp-song"></select>
+                    <button onclick="createRoom()">Create Room</button>
+                </div>
+                <div class="mp-join">
+                    <h3>Join Room</h3>
+                    <input type="text" id="room-code" placeholder="Room Code" maxlength="6">
+                    <button onclick="joinRoom()">Join</button>
+                </div>
+            </div>
+            <div id="mp-status" class="mp-status"></div>
+            <button class="back-btn" onclick="showMenu()">Back</button>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

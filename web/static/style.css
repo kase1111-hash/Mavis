@@ -1,0 +1,370 @@
+/* Mavis Web Interface */
+
+:root {
+    --bg: #1a1a2e;
+    --bg-light: #16213e;
+    --primary: #0f3460;
+    --accent: #e94560;
+    --text: #eee;
+    --text-dim: #888;
+    --green: #4ade80;
+    --yellow: #facc15;
+    --red: #ef4444;
+    --cyan: #22d3ee;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Courier New', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+#app {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.screen {
+    display: none;
+}
+
+.screen.active {
+    display: block;
+}
+
+/* Menu */
+h1 {
+    font-size: 3rem;
+    color: var(--cyan);
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    text-align: center;
+    color: var(--text-dim);
+    margin-bottom: 2rem;
+}
+
+h2 {
+    color: var(--cyan);
+    margin-bottom: 1rem;
+}
+
+h3 {
+    color: var(--text);
+    margin-bottom: 0.5rem;
+}
+
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+button {
+    padding: 0.75rem 1.5rem;
+    font-family: inherit;
+    font-size: 1rem;
+    background: var(--primary);
+    color: var(--text);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+button:hover {
+    background: var(--accent);
+}
+
+.back-btn {
+    margin-top: 1.5rem;
+    background: transparent;
+    border-color: var(--text-dim);
+}
+
+.back-btn:hover {
+    background: var(--bg-light);
+}
+
+/* Song Browser */
+.difficulty-filter {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.filter-btn {
+    padding: 0.4rem 1rem;
+    font-size: 0.85rem;
+}
+
+.filter-btn.active {
+    background: var(--accent);
+}
+
+#song-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.song-card {
+    padding: 0.75rem 1rem;
+    background: var(--bg-light);
+    border: 1px solid var(--primary);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.song-card:hover {
+    border-color: var(--accent);
+}
+
+.song-title {
+    font-weight: bold;
+}
+
+.song-meta {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+}
+
+.diff-easy { color: var(--green); }
+.diff-medium { color: var(--yellow); }
+.diff-hard { color: var(--red); }
+
+/* Gameplay */
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--primary);
+}
+
+.game-stats {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.game-stats strong {
+    color: var(--cyan);
+}
+
+.sheet-text {
+    background: var(--bg-light);
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    white-space: pre-wrap;
+    line-height: 1.8;
+    font-size: 1.1rem;
+    min-height: 3rem;
+}
+
+.buffers {
+    margin-bottom: 1rem;
+}
+
+.buffer-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.buffer-row label {
+    width: 3rem;
+    font-weight: bold;
+    text-align: right;
+}
+
+.buffer-bar {
+    flex: 1;
+    height: 1.2rem;
+    background: #333;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    width: 0%;
+    transition: width 0.1s, background-color 0.3s;
+    background: var(--green);
+}
+
+.bar-fill.overflow { background: var(--yellow); }
+.bar-fill.underflow { background: var(--red); }
+
+.status-badge {
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.status-optimal { background: var(--green); color: #000; }
+.status-overflow { background: var(--yellow); color: #000; }
+.status-underflow { background: var(--red); color: #fff; }
+
+.phoneme-display {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1rem;
+    color: var(--text-dim);
+}
+
+.phoneme-display strong {
+    color: var(--text);
+}
+
+.typed-area {
+    margin-bottom: 1rem;
+}
+
+.typed-area label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.typed-text {
+    background: var(--bg-light);
+    padding: 0.75rem;
+    border-radius: 4px;
+    min-height: 2rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.game-controls {
+    margin-bottom: 1rem;
+}
+
+.hint {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+/* Results */
+#results-content {
+    background: var(--bg-light);
+    padding: 1.5rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    line-height: 2;
+}
+
+.result-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Leaderboard */
+#leaderboard-content {
+    background: var(--bg-light);
+    padding: 1rem;
+    border-radius: 4px;
+}
+
+.lb-song {
+    margin-bottom: 1rem;
+}
+
+.lb-song h3 {
+    margin-bottom: 0.5rem;
+    color: var(--cyan);
+}
+
+.lb-entry {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #333;
+}
+
+.lb-rank { width: 2rem; color: var(--text-dim); }
+.lb-name { flex: 1; }
+.lb-score { width: 5rem; text-align: right; font-weight: bold; }
+.lb-grade { width: 3rem; text-align: center; color: var(--cyan); }
+
+/* Settings */
+.setting-group {
+    margin-bottom: 1rem;
+}
+
+.setting-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: bold;
+}
+
+.setting-group select,
+.setting-group input {
+    width: 100%;
+    max-width: 400px;
+    padding: 0.5rem;
+    font-family: inherit;
+    font-size: 0.95rem;
+    background: var(--bg-light);
+    color: var(--text);
+    border: 1px solid var(--primary);
+    border-radius: 4px;
+}
+
+/* Multiplayer */
+.mp-options {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1rem;
+}
+
+.mp-create, .mp-join {
+    flex: 1;
+    background: var(--bg-light);
+    padding: 1rem;
+    border-radius: 4px;
+}
+
+.mp-create select,
+.mp-create button,
+.mp-join input,
+.mp-join button {
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+.mp-status {
+    background: var(--bg-light);
+    padding: 1rem;
+    border-radius: 4px;
+    min-height: 2rem;
+    color: var(--text-dim);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    h1 { font-size: 2rem; }
+    .mp-options { flex-direction: column; }
+    .game-header { flex-direction: column; gap: 0.5rem; }
+}
