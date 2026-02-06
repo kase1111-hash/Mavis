@@ -2,7 +2,7 @@
 
 ## Project Summary
 
-Mavis is a vocal typing instrument that converts keyboard input with prosody markup ("Sheet Text") into singing via an LLM + TTS pipeline. It is a Python 3.8+ project. Phase 1 (Playable Alpha) is implemented with mock backends, a full pipeline, scoring, and two working demos. Performance data exports to the [Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol) IML format.
+Mavis is a vocal typing instrument that converts keyboard input with prosody markup ("Sheet Text") into singing via an LLM + TTS pipeline. It is a Python 3.8+ project. Phase 1 (Playable Alpha) and Phase 2 (Game Polish) are implemented with mock backends, a full pipeline, scoring, 10-song library, difficulty levels, leaderboards, voice customization, tutorial mode, and two working demos. Performance data exports to the [Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol) IML format.
 
 ## Repository Structure
 
@@ -19,8 +19,13 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │   ├── pipeline.py               # Pipeline orchestrator (wires all components)
 │   ├── scoring.py                # Score tracker and grading
 │   ├── songs.py                  # Song loader (JSON -> Song dataclass)
-│   └── export.py                 # Prosody-Protocol IML/dataset export
-├── tests/                        # pytest test suite (95 tests)
+│   ├── export.py                 # Prosody-Protocol IML/dataset export
+│   ├── song_browser.py           # Song list/filter/display (Phase 2)
+│   ├── difficulty.py             # Difficulty presets and settings (Phase 2)
+│   ├── leaderboard.py            # Local JSON leaderboard storage (Phase 2)
+│   ├── voice.py                  # Voice profile presets and persistence (Phase 2)
+│   └── tutorial.py               # 7-lesson tutorial with progress tracking (Phase 2)
+├── tests/                        # pytest test suite (152 tests)
 │   ├── test_input_buffer.py
 │   ├── test_sheet_text.py
 │   ├── test_config.py
@@ -30,12 +35,26 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │   ├── test_pipeline.py
 │   ├── test_scoring.py
 │   ├── test_songs.py
-│   └── test_export.py
+│   ├── test_export.py
+│   ├── test_song_browser.py
+│   ├── test_difficulty.py
+│   ├── test_leaderboard.py
+│   ├── test_voice.py
+│   └── test_tutorial.py
 ├── demos/
 │   ├── vocal_typing_demo.py      # Non-interactive pipeline visualization
-│   └── interactive_vocal_typing.py  # Curses-based interactive typing demo
-├── songs/
-│   └── twinkle.json              # First playable song
+│   └── interactive_vocal_typing.py  # Curses-based interactive demo with menus
+├── songs/                        # 10-song library across 3 difficulty tiers
+│   ├── twinkle.json              # Easy: Twinkle Twinkle Little Star
+│   ├── mary_lamb.json            # Easy: Mary Had a Little Lamb
+│   ├── row_boat.json             # Easy: Row Row Row Your Boat
+│   ├── amazing_grace.json        # Medium: Amazing Grace
+│   ├── hallelujah.json           # Medium: Hallelujah
+│   ├── bohemian.json             # Medium: Bohemian Rhapsody (Excerpt)
+│   ├── somewhere_rainbow.json    # Medium: Somewhere Over the Rainbow
+│   ├── dont_stop.json            # Hard: Don't Stop Believin' (Excerpt)
+│   ├── nessun_dorma.json         # Hard: Nessun Dorma (Excerpt)
+│   └── rap_god.json              # Hard: Rap God (Excerpt)
 ├── pyproject.toml                # Python packaging config
 ├── .gitignore
 ├── README.md
@@ -44,6 +63,45 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 ├── LICENSE
 └── CLAUDE.md                     # This file
 ```
+
+## Phase 2 Modules
+
+### Difficulty System (`mavis/difficulty.py`)
+- `DifficultySettings` dataclass with buffer capacities, zone thresholds, point values, drain rate multipliers.
+- 4 presets: Easy (wide zone, gentle penalties), Medium (standard), Hard (narrow zone, harsh penalties), Expert (razor-thin zone).
+- Pipeline auto-applies difficulty: adjusts input/output buffer capacities and optimal zone thresholds.
+- `get_difficulty(name)` and `list_difficulties()` for lookup.
+
+### Song Browser (`mavis/song_browser.py`)
+- `browse_songs(directory, difficulty)` -- list and filter songs from the `songs/` directory.
+- `group_by_difficulty(songs)` -- organize songs into easy/medium/hard groups.
+- `song_summary(song)` and `format_song_list(songs)` -- terminal display formatting.
+
+### Leaderboard (`mavis/leaderboard.py`)
+- `Leaderboard` class backed by a JSON file at `~/.mavis/leaderboards.json`.
+- `submit(entry)` returns rank (1-based), auto-sorts and enforces max entries per song.
+- `get_scores(song_id, difficulty, limit)` for filtered retrieval.
+- `format_scores(song_id)` for terminal display.
+
+### Voice Customization (`mavis/voice.py`)
+- `VoiceProfile` dataclass: base_pitch_hz, pitch_range, vibrato_depth/rate, breathiness, volume_scale, timbre.
+- 6 presets: Default, Alto, Soprano, Bass, Whisper, Robot.
+- Pipeline applies voice profile to PhonemeEvents (pitch scaling, breathiness, volume).
+- `save_voice_preference()` / `load_voice_preference()` persists to `~/.mavis/voice.json`.
+
+### Tutorial Mode (`mavis/tutorial.py`)
+- 7 progressive lessons: Basic Typing, Emphasis, Soft Voice, Sustain, Harmony, Buffer Management, Full Performance.
+- Each lesson has steps with instructions, practice text, and hints.
+- `TutorialProgress` tracks completion and best grade per lesson (no downgrade).
+- `format_lesson_list(progress)` for terminal display with grade markers.
+
+### Interactive Demo Enhancements
+- Main menu: Play a Song, Tutorial, Leaderboard, Settings, Quit.
+- Song browser with difficulty-sorted list and curses navigation.
+- Settings menu for difficulty and voice selection.
+- Leaderboard display screen.
+- Tutorial menu with lesson selection.
+- Results screen with automatic leaderboard submission.
 
 ## Prosody-Protocol Integration
 
@@ -96,6 +154,8 @@ Install with `pip install prosody-protocol` or `pip install mavis[prosody]`. Whe
 - **Buffer management**: The core gameplay mechanic. Users control vocal output by managing typing speed and pause timing to keep the buffer in an optimal zone.
 - **Latency as gameplay**: The 600ms-1.5s processing delay is intentional -- users read ahead in the Sheet Text, absorbing latency through lookahead.
 - **IML (Intent Markup Language)**: The XML interchange format defined by Prosody-Protocol for preserving prosodic annotations. Mavis exports to this format.
+- **Difficulty levels**: 4 presets (Easy/Medium/Hard/Expert) that adjust buffer sizes, zone thresholds, and scoring penalties.
+- **Voice profiles**: 6 presets that modify synthesis pitch, vibrato, breathiness, and volume.
 
 ## Tech Stack
 
@@ -103,9 +163,9 @@ Install with `pip install prosody-protocol` or `pip install mavis[prosody]`. Whe
 - **Packaging**: pyproject.toml with optional dependency groups
 - **LLM**: MockLLMProcessor (working), llama-cpp-python and Claude API (stubs)
 - **TTS**: MockAudioSynthesizer (sine waves, working), espeak-ng and Coqui (stubs)
-- **Interface**: curses (working terminal demo)
+- **Interface**: curses (working terminal demo with menus)
 - **Data format**: Prosody-Protocol IML 1.0 (XML) + dataset-entry JSON schema
-- **Testing**: pytest (95 tests passing)
+- **Testing**: pytest (152 tests passing)
 
 ## Development Commands
 
@@ -116,10 +176,10 @@ python3 -m pytest tests/ -v
 # Run the non-interactive pipeline demo
 python3 demos/vocal_typing_demo.py
 
-# Run the interactive typing demo
+# Run the interactive typing demo (main menu)
 python3 demos/interactive_vocal_typing.py
 
-# Run with a song loaded
+# Run with a song loaded directly
 python3 demos/interactive_vocal_typing.py songs/twinkle.json
 
 # Import check
@@ -127,6 +187,12 @@ python3 -c "import mavis; print(mavis.__version__)"
 
 # Export a test IML document
 python3 -c "from mavis.export import tokens_to_iml; from mavis.sheet_text import SheetTextToken; print(tokens_to_iml([SheetTextToken(text='SUN', emphasis='loud')]))"
+
+# List all songs
+python3 -c "from mavis.song_browser import browse_songs, format_song_list; print(format_song_list(browse_songs('songs')))"
+
+# List difficulty presets
+python3 -c "from mavis.difficulty import list_difficulties; [print(f'{d.name}: {d.description}') for d in list_difficulties()]"
 ```
 
 ## Development Guidelines
@@ -152,16 +218,20 @@ python3 -c "from mavis.export import tokens_to_iml; from mavis.sheet_text import
 1. Create a JSON file in `songs/` following the format of `twinkle.json`.
 2. Required fields: `title`, `bpm`, `difficulty`, `sheet_text`, `tokens`.
 3. Each token needs: `text`, `emphasis`, `sustain`, `harmony`, `duration_modifier`.
-4. Test with: `python3 -c "from mavis.songs import load_song; print(load_song('songs/yourfile.json'))"`.
+4. Difficulty must be `"easy"`, `"medium"`, or `"hard"`.
+5. Test with: `python3 -c "from mavis.songs import load_song; print(load_song('songs/yourfile.json'))"`.
 
 ## Architecture Notes
 
 - `InputBuffer` uses `collections.deque(maxlen=capacity)` for O(1) push/consume with automatic overflow.
 - Sheet Text parser uses a two-pass approach: first pass groups chars into words and detects markup, second pass promotes consecutive "loud" tokens to "shout".
 - `MockLLMProcessor` uses a hardcoded English-to-phoneme dictionary (~50 words) with emphasis-to-prosody mapping.
-- `OutputBuffer` tracks fill/drain rates over a 2-second sliding window for real-time status display.
-- `MavisPipeline.tick()` runs the full cycle: consume input -> parse -> LLM -> buffer -> synthesize. When recording is active, every event is timestamped and stored in the `PerformanceRecording`.
+- `OutputBuffer` tracks fill/drain rates over a 2-second sliding window for real-time status display. Supports custom low/high thresholds for difficulty integration.
+- `MavisPipeline.tick()` runs the full cycle: consume input -> parse -> LLM -> apply voice profile -> buffer -> synthesize. When recording is active, every event is timestamped and stored in the `PerformanceRecording`.
+- `MavisPipeline.__init__()` reads `config.difficulty_name` and `config.voice_name` to auto-apply difficulty settings (buffer capacities, zone thresholds) and voice profile (pitch scaling, breathiness).
 - `mavis/export.py` maps Mavis data to Prosody-Protocol IML without requiring the `prosody_protocol` SDK at runtime, but produces output the SDK can validate.
+- `Leaderboard` persists to `~/.mavis/leaderboards.json` and auto-sorts/trims entries per song.
+- Voice profiles modify PhonemeEvents through `_apply_voice()` which scales pitch proportionally to base_pitch_hz and blends breathiness.
 
 ## Related Ecosystem
 

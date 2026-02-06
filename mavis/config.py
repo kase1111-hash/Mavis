@@ -1,6 +1,7 @@
 """Central configuration for hardware profiles, buffer sizes, and backend selection."""
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 
 @dataclass
@@ -29,3 +30,5 @@ class MavisConfig:
     output_buffer_capacity: int = 128
     llm_backend: str = "mock"  # "mock" | "llama" | "claude"
     tts_backend: str = "mock"  # "mock" | "espeak" | "coqui" | "elevenlabs"
+    difficulty_name: Optional[str] = None  # if set, overrides buffer sizes from difficulty
+    voice_name: Optional[str] = None  # if set, applies voice profile to synthesis
