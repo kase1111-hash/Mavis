@@ -13,11 +13,12 @@ import hashlib
 import hmac
 import json
 import os
-import tempfile
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+from mavis.storage import atomic_json_save, locked_json_load
 
 # License tiers and their feature sets
 TIERS = {
@@ -229,9 +230,8 @@ class LicenseManager:
         self._load()
 
     def _load(self) -> None:
-        if os.path.isfile(self.path) and os.path.getsize(self.path) > 0:
-            with open(self.path, "r") as f:
-                data = json.load(f)
+        data = locked_json_load(self.path)
+        if data:
             self._license = LicenseInfo(
                 tier=data.get("tier", "free"),
                 institution=data.get("institution", ""),
@@ -244,9 +244,7 @@ class LicenseManager:
             )
 
     def _save(self) -> None:
-        dir_path = os.path.dirname(self.path) or "."
-        os.makedirs(dir_path, exist_ok=True)
-        data = {
+        atomic_json_save(self.path, {
             "tier": self._license.tier,
             "institution": self._license.institution,
             "license_key": self._license.license_key,
@@ -255,15 +253,7 @@ class LicenseManager:
             "max_users": self._license.max_users,
             "last_validated": self._license.last_validated,
             "offline_grace_until": self._license.offline_grace_until,
-        }
-        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump(data, f, indent=2)
-            os.replace(tmp, self.path)
-        except BaseException:
-            os.unlink(tmp)
-            raise
+        })
 
     def activate(self, key: str) -> Optional[LicenseInfo]:
         """Activate a license key. Returns LicenseInfo or None if invalid."""

@@ -2,10 +2,11 @@
 
 import json
 import os
-import tempfile
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+
+from mavis.storage import atomic_json_save, locked_json_load
 
 
 @dataclass
@@ -39,25 +40,12 @@ class Leaderboard:
 
     def _load(self) -> None:
         """Load entries from the JSON file if it exists."""
-        if os.path.isfile(self.path):
-            with open(self.path, "r") as f:
-                data = json.load(f)
-            self._entries = data.get("songs", {})
-        else:
-            self._entries = {}
+        data = locked_json_load(self.path)
+        self._entries = data.get("songs", {}) if data else {}
 
     def _save(self) -> None:
-        """Persist entries to the JSON file (atomic write)."""
-        dir_path = os.path.dirname(self.path) or "."
-        os.makedirs(dir_path, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump({"songs": self._entries}, f, indent=2)
-            os.replace(tmp, self.path)
-        except BaseException:
-            os.unlink(tmp)
-            raise
+        """Persist entries to the JSON file (atomic write with file lock)."""
+        atomic_json_save(self.path, {"songs": self._entries})
 
     def submit(self, entry: LeaderboardEntry) -> int:
         """Submit a score and return its rank (1-based) within that song.
