@@ -6,15 +6,17 @@ Run with:
     python -m web.server
 """
 
-import asyncio
 import json
+import logging
 import os
 import sys
+import time
 import uuid
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 # Ensure the project root is on the path
@@ -22,20 +24,65 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from mavis.cloud import SyncPayload, UserStore, generate_token, verify_token
 from mavis.config import LAPTOP_CPU, MavisConfig
-from mavis.leaderboard import Leaderboard, LeaderboardEntry, get_default_leaderboard
+from mavis.leaderboard import LeaderboardEntry, get_default_leaderboard
 from mavis.licensing import LicenseManager, list_tiers
-from mavis.pipeline import create_pipeline, MavisPipeline
+from mavis.pipeline import create_pipeline
 from mavis.researcher_api import APIKeyStore, PerformanceStore
 from mavis.scoring import ScoreTracker
 from mavis.song_browser import browse_songs
 from mavis.song_editor import CommunityLibrary, SongDraft
-from mavis.songs import Song, load_song, list_songs
+from mavis.songs import Song, list_songs
+
+logger = logging.getLogger("mavis.web")
 
 app = FastAPI(title="Mavis", description="Vocal Typing Instrument - Web Interface")
+
+# --- CORS Configuration ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.environ.get("MAVIS_CORS_ORIGINS", "http://localhost:3000,http://localhost:8000").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- Rate Limiting (simple in-memory, per-IP) ---
+_rate_limit_log: Dict[str, List[float]] = {}
+_RATE_LIMIT_RPM = int(os.environ.get("MAVIS_RATE_LIMIT_RPM", "120"))  # requests per minute
+_WS_MAX_MESSAGE_SIZE = int(os.environ.get("MAVIS_WS_MAX_MSG_SIZE", "4096"))
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Simple per-IP rate limiting for HTTP endpoints."""
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    window_start = now - 60
+
+    log = _rate_limit_log.get(client_ip, [])
+    log = [t for t in log if t > window_start]
+
+    if len(log) >= _RATE_LIMIT_RPM:
+        return JSONResponse(
+            status_code=429,
+            content={"error": "Rate limit exceeded. Try again later."},
+        )
+
+    log.append(now)
+    _rate_limit_log[client_ip] = log
+    return await call_next(request)
+
 
 # Mount static files
 _static_dir = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+
+
+# --- Health Check ---
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring."""
+    return {"status": "ok", "service": "mavis"}
 
 
 # --- Active sessions ---
@@ -137,6 +184,20 @@ async def get_songs(difficulty: Optional[str] = None):
         }
         for s in songs
     ]
+
+
+@app.get("/api/songs/community")
+async def browse_community(
+    sort_by: str = "rating",
+    difficulty: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+):
+    """Browse community-uploaded songs."""
+    entries = _community.browse(
+        sort_by=sort_by, difficulty=difficulty, limit=limit, offset=offset
+    )
+    return [e.to_dict() for e in entries]
 
 
 @app.get("/api/songs/{song_id}")
@@ -302,20 +363,6 @@ async def upload_song(data: dict):
     return {"entry_id": entry.entry_id, "title": draft.title}
 
 
-@app.get("/api/songs/community")
-async def browse_community(
-    sort_by: str = "rating",
-    difficulty: Optional[str] = None,
-    limit: int = 20,
-    offset: int = 0,
-):
-    """Browse community-uploaded songs."""
-    entries = _community.browse(
-        sort_by=sort_by, difficulty=difficulty, limit=limit, offset=offset
-    )
-    return [e.to_dict() for e in entries]
-
-
 @app.post("/api/songs/{entry_id}/rate")
 async def rate_song(entry_id: str, data: dict):
     """Rate a community song (1-5 stars)."""
@@ -460,7 +507,17 @@ async def websocket_play(websocket: WebSocket):
     try:
         while True:
             raw = await websocket.receive_text()
-            msg = json.loads(raw)
+            if len(raw) > _WS_MAX_MESSAGE_SIZE:
+                await websocket.send_json({"type": "error", "message": "Message too large"})
+                continue
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
+                continue
+            if not isinstance(msg, dict):
+                await websocket.send_json({"type": "error", "message": "Expected JSON object"})
+                continue
             msg_type = msg.get("type", "")
 
             if msg_type == "start":
@@ -609,7 +666,17 @@ async def websocket_room(websocket: WebSocket, room_id: str):
     try:
         while True:
             raw = await websocket.receive_text()
-            msg = json.loads(raw)
+            if len(raw) > _WS_MAX_MESSAGE_SIZE:
+                await websocket.send_json({"type": "error", "message": "Message too large"})
+                continue
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
+                continue
+            if not isinstance(msg, dict):
+                await websocket.send_json({"type": "error", "message": "Expected JSON object"})
+                continue
             msg_type = msg.get("type", "")
 
             if msg_type == "join":

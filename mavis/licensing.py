@@ -13,6 +13,7 @@ import hashlib
 import hmac
 import json
 import os
+import tempfile
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -78,9 +79,17 @@ TIERS = {
     },
 }
 
-# Secret used for license key generation/verification (in production, this
-# would come from environment variables or a secrets vault)
-_LICENSE_SECRET = os.environ.get("MAVIS_LICENSE_SECRET", "mavis-dev-secret-key")
+# Secret used for license key generation/verification.
+# Falls back to a dev-only default with a warning if MAVIS_LICENSE_SECRET is unset.
+_LICENSE_SECRET = os.environ.get("MAVIS_LICENSE_SECRET", "")
+if not _LICENSE_SECRET:
+    import warnings
+    warnings.warn(
+        "MAVIS_LICENSE_SECRET not set -- using insecure dev default. "
+        "Set this environment variable before any production deployment.",
+        stacklevel=1,
+    )
+    _LICENSE_SECRET = "mavis-dev-secret-key"
 
 # Offline grace period in seconds (7 days)
 _OFFLINE_GRACE_SECONDS = 7 * 24 * 60 * 60
@@ -235,7 +244,8 @@ class LicenseManager:
             )
 
     def _save(self) -> None:
-        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
+        dir_path = os.path.dirname(self.path) or "."
+        os.makedirs(dir_path, exist_ok=True)
         data = {
             "tier": self._license.tier,
             "institution": self._license.institution,
@@ -246,8 +256,14 @@ class LicenseManager:
             "last_validated": self._license.last_validated,
             "offline_grace_until": self._license.offline_grace_until,
         }
-        with open(self.path, "w") as f:
-            json.dump(data, f, indent=2)
+        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp, self.path)
+        except BaseException:
+            os.unlink(tmp)
+            raise
 
     def activate(self, key: str) -> Optional[LicenseInfo]:
         """Activate a license key. Returns LicenseInfo or None if invalid."""

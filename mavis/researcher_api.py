@@ -6,8 +6,11 @@ the FastAPI server endpoints.
 """
 
 import hashlib
+import hmac as _hmac_mod
 import json
 import os
+import secrets
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -74,9 +77,16 @@ class PerformanceStore:
             self._performances = {}
 
     def _save(self) -> None:
-        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        with open(self.path, "w") as f:
-            json.dump({"performances": self._performances}, f, indent=2)
+        dir_path = os.path.dirname(self.path) or "."
+        os.makedirs(dir_path, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump({"performances": self._performances}, f, indent=2)
+            os.replace(tmp, self.path)
+        except BaseException:
+            os.unlink(tmp)
+            raise
 
     def record(self, perf: AnonymizedPerformance) -> str:
         """Store a performance. Returns the performance ID."""
@@ -235,9 +245,10 @@ class APIKey:
     """A researcher API key."""
 
     key_id: str
-    key_hash: str  # SHA-256 hash of the actual key
-    owner: str
-    created_at: str
+    key_hash: str  # salted SHA-256 hash of the actual key
+    key_salt: str = ""  # salt for key hashing
+    owner: str = ""
+    created_at: str = ""
     requests_today: int = 0
     last_request_date: str = ""
 
@@ -245,6 +256,7 @@ class APIKey:
         return {
             "key_id": self.key_id,
             "key_hash": self.key_hash,
+            "key_salt": self.key_salt,
             "owner": self.owner,
             "created_at": self.created_at,
             "requests_today": self.requests_today,
@@ -272,23 +284,45 @@ class APIKeyStore:
             with open(self.path, "r") as f:
                 data = json.load(f)
             self._keys = data.get("keys", {})
+            # Restore persisted rate limit timestamps
+            now = time.time()
+            window_start = now - 60
+            for key_id, timestamps in data.get("rate_limits", {}).items():
+                self._request_log[key_id] = [t for t in timestamps if t > window_start]
         else:
             self._keys = {}
 
     def _save(self) -> None:
-        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        with open(self.path, "w") as f:
-            json.dump({"keys": self._keys}, f, indent=2)
+        dir_path = os.path.dirname(self.path) or "."
+        os.makedirs(dir_path, exist_ok=True)
+        # Prune stale rate limit entries before persisting
+        now = time.time()
+        window_start = now - 60
+        rate_limits = {}
+        for key_id, timestamps in self._request_log.items():
+            pruned = [t for t in timestamps if t > window_start]
+            if pruned:
+                rate_limits[key_id] = pruned
+        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump({"keys": self._keys, "rate_limits": rate_limits}, f, indent=2)
+            os.replace(tmp, self.path)
+        except BaseException:
+            os.unlink(tmp)
+            raise
 
     def register(self, owner: str) -> str:
         """Register a new API key. Returns the plaintext key."""
         key_id = str(uuid.uuid4())[:8]
         raw_key = f"mavis_{key_id}_{uuid.uuid4().hex[:16]}"
-        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+        salt = secrets.token_hex(16)
+        key_hash = hashlib.sha256(f"{salt}:{raw_key}".encode()).hexdigest()
 
         self._keys[key_id] = APIKey(
             key_id=key_id,
             key_hash=key_hash,
+            key_salt=salt,
             owner=owner,
             created_at=datetime.now(timezone.utc).isoformat(),
         ).to_dict()
@@ -297,9 +331,14 @@ class APIKeyStore:
 
     def validate(self, raw_key: str) -> Optional[str]:
         """Validate an API key. Returns key_id if valid, None otherwise."""
-        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
         for key_id, data in self._keys.items():
-            if data.get("key_hash") == key_hash:
+            salt = data.get("key_salt", "")
+            if salt:
+                key_hash = hashlib.sha256(f"{salt}:{raw_key}".encode()).hexdigest()
+            else:
+                # Legacy unsalted keys
+                key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+            if _hmac_mod.compare_digest(data.get("key_hash", ""), key_hash):
                 return key_id
         return None
 

@@ -6,6 +6,7 @@ and managing a community song library with ratings and moderation.
 
 import json
 import os
+import tempfile
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -161,9 +162,16 @@ class CommunityLibrary:
             self._entries = {}
 
     def _save(self) -> None:
-        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        with open(self.path, "w") as f:
-            json.dump({"entries": self._entries}, f, indent=2)
+        dir_path = os.path.dirname(self.path) or "."
+        os.makedirs(dir_path, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump({"entries": self._entries}, f, indent=2)
+            os.replace(tmp, self.path)
+        except BaseException:
+            os.unlink(tmp)
+            raise
 
     def submit(self, draft: SongDraft, author: str = "") -> CommunityEntry:
         """Submit a song to the community library. Returns the entry."""
