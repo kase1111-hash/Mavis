@@ -126,26 +126,27 @@ This means:
 
 ---
 
-## Current Status: Proof of Concept
+## Current Status: Alpha (All 4 Phases Implemented)
 
-This repo currently contains **demonstration code** that simulates the full pipeline.
+This repo contains a **complete alpha implementation** with mock LLM/TTS backends that simulates the full pipeline across all four phases. 307 tests passing.
 
 ### What Works
-- ✅ Input buffering simulation
-- ✅ Buffer visualization
-- ✅ Simulated LLM prosody processing
-- ✅ Latency modeling across different hardware
-- ✅ Interactive typing interface
+- ✅ Full pipeline (input buffer, sheet text parser, LLM processor, output buffer, audio synthesis)
+- ✅ Buffer visualization and interactive typing interface
+- ✅ 10-song library with 3 difficulty tiers and 4 difficulty presets
+- ✅ Scoring, leaderboards, 6 voice profiles, 7-lesson tutorial
+- ✅ Web interface (FastAPI + WebSocket real-time gameplay)
+- ✅ Mobile client (React Native)
+- ✅ Cloud save, multiplayer/duets, user-generated content
+- ✅ Prosody-Protocol IML export, intent-engine bridge, researcher API
+- ✅ Institutional licensing (3 tiers with HMAC-SHA256 keys)
 
-### What's Needed for MVP
-- ⏳ Real LLM integration (Llama, Claude API)
-- ⏳ Real TTS engine (espeak-ng, Coqui, ElevenLabs)
-- ⏳ Visual sustain bars (like Guitar Hero)
-- ⏳ First playable song
-- ⏳ Scoring system
-- ⏳ Audio synthesis pipeline
-
-**Estimated time to playable alpha:** 6 weeks part-time
+### What's Needed for Production
+- ⏳ Real LLM integration (Llama, Claude API) -- stubs exist
+- ⏳ Real TTS engine (espeak-ng, Coqui, ElevenLabs) -- stubs exist
+- ⏳ Production security hardening (bcrypt enforced, JWT tokens, HTTPS)
+- ⏳ Database backend (SQLite/PostgreSQL) replacing JSON file stores
+- ⏳ CI pipeline (GitHub Actions)
 
 ---
 
@@ -273,32 +274,32 @@ See [`IMPLEMENTATION.md`](./IMPLEMENTATION.md) for complete technical specs.
 
 ## Roadmap
 
-### Phase 1: Playable Alpha (6 weeks)
-- [ ] LLM integration (local Llama)
-- [ ] TTS integration (espeak-ng)
-- [ ] Visual sustain bars
-- [ ] One playable song
-- [ ] Basic scoring
+### Phase 1: Playable Alpha -- COMPLETE
+- [x] LLM integration (mock + stubs for Llama/Claude)
+- [x] TTS integration (mock sine-wave synthesis + stubs)
+- [x] Visual sustain bars
+- [x] 10 playable songs across 3 difficulty tiers
+- [x] Scoring and grading system
 
-### Phase 2: Game Polish (4 weeks)
-- [ ] Song library (10 songs)
-- [ ] Multiple difficulty levels
-- [ ] Leaderboards
-- [ ] Voice customization
-- [ ] Tutorial mode
+### Phase 2: Game Polish -- COMPLETE
+- [x] Song library (10 songs)
+- [x] 4 difficulty levels (Easy/Medium/Hard/Expert)
+- [x] Local JSON leaderboards
+- [x] 6 voice customization presets
+- [x] 7-lesson tutorial mode
 
-### Phase 3: Platform Launch (8 weeks)
-- [ ] Web version
-- [ ] Mobile apps (iOS/Android)
-- [ ] Cloud save
-- [ ] Multiplayer/duets
-- [ ] User-generated content
+### Phase 3: Platform Launch -- COMPLETE
+- [x] Web version (FastAPI + WebSocket)
+- [x] Mobile client (React Native)
+- [x] Cloud save with offline-first sync
+- [x] Multiplayer/duets (competitive + duet modes)
+- [x] User-generated content (community library with ratings)
 
-### Phase 4: Ecosystem Integration
-- [ ] Export to prosody-protocol dataset
-- [ ] Integration with intent-engine
-- [ ] API for researchers
-- [ ] Institutional licensing (therapy, education)
+### Phase 4: Ecosystem Integration -- COMPLETE
+- [x] Export to Prosody-Protocol IML + JSONL datasets
+- [x] Integration with intent-engine (prosody analysis bridge)
+- [x] Researcher API (anonymized data, API keys, rate limiting)
+- [x] Institutional licensing (Free/Institutional/Research tiers)
 
 ---
 

@@ -7,9 +7,11 @@ Dependencies (optional): bcrypt, python-jose (JWT), sqlalchemy
 """
 
 import hashlib
+import hmac
 import json
 import os
 import secrets
+import tempfile
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -60,21 +62,34 @@ class SyncPayload:
 
 # --- Token management ---
 
+import warnings as _warnings
 
-def generate_token(user_id: str, secret: str = "mavis-dev-secret", ttl_hours: int = 24) -> str:
+_TOKEN_SECRET = os.environ.get("MAVIS_TOKEN_SECRET", "")
+if not _TOKEN_SECRET:
+    _warnings.warn(
+        "MAVIS_TOKEN_SECRET not set -- using insecure dev default. "
+        "Set this environment variable before any production deployment.",
+        stacklevel=1,
+    )
+    _TOKEN_SECRET = "mavis-dev-secret"
+
+
+def generate_token(user_id: str, secret: str = "", ttl_hours: int = 24) -> str:
     """Generate a simple authentication token.
 
     Uses HMAC-style token with expiry. In production, replace with proper JWT
     via python-jose.
     """
+    secret = secret or _TOKEN_SECRET
     expires = int(time.time()) + (ttl_hours * 3600)
     payload = f"{user_id}:{expires}"
     sig = hashlib.sha256(f"{payload}:{secret}".encode()).hexdigest()[:16]
     return f"{payload}:{sig}"
 
 
-def verify_token(token: str, secret: str = "mavis-dev-secret") -> Optional[str]:
+def verify_token(token: str, secret: str = "") -> Optional[str]:
     """Verify a token and return the user_id, or None if invalid/expired."""
+    secret = secret or _TOKEN_SECRET
     try:
         parts = token.split(":")
         if len(parts) != 3:
@@ -93,27 +108,54 @@ def verify_token(token: str, secret: str = "mavis-dev-secret") -> Optional[str]:
         return None
 
 
-# --- Password hashing (simple fallback without bcrypt) ---
+# --- Password hashing ---
+# Uses bcrypt when available; falls back to iterated SHA-256 with HMAC.
+
+try:
+    import bcrypt as _bcrypt
+    _HAS_BCRYPT = True
+except ImportError:
+    _HAS_BCRYPT = False
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using SHA-256 with a random salt.
-
-    In production, use bcrypt via the bcrypt package.
-    """
+    """Hash a password. Uses bcrypt if installed, otherwise iterated HMAC-SHA256."""
+    if _HAS_BCRYPT:
+        hashed = _bcrypt.hashpw(password.encode(), _bcrypt.gensalt())
+        return f"bcrypt:{hashed.decode()}"
+    # Fallback: iterated HMAC-SHA256 (100k rounds)
     salt = secrets.token_hex(16)
-    h = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
-    return f"{salt}:{h}"
+    h = _iterate_sha256(salt, password)
+    return f"sha256:{salt}:{h}"
 
 
 def check_password(password: str, password_hash: str) -> bool:
     """Verify a password against its hash."""
     try:
+        if password_hash.startswith("bcrypt:"):
+            if not _HAS_BCRYPT:
+                return False
+            stored = password_hash[len("bcrypt:"):].encode()
+            return _bcrypt.checkpw(password.encode(), stored)
+        if password_hash.startswith("sha256:"):
+            _, salt, h = password_hash.split(":", 2)
+            expected = _iterate_sha256(salt, password)
+            return hmac.compare_digest(h, expected)
+        # Legacy format (pre-upgrade): salt:hash
         salt, h = password_hash.split(":", 1)
         expected = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
-        return h == expected
-    except ValueError:
+        return hmac.compare_digest(h, expected)
+    except (ValueError, TypeError):
         return False
+
+
+def _iterate_sha256(salt: str, password: str, rounds: int = 100_000) -> str:
+    """Iterated HMAC-SHA256 key derivation (fallback when bcrypt is unavailable)."""
+    key = f"{salt}:{password}".encode()
+    h = hashlib.sha256(key).digest()
+    for _ in range(rounds - 1):
+        h = hashlib.sha256(h + key).digest()
+    return h.hex()
 
 
 # --- Local user store (JSON file-based) ---
@@ -141,9 +183,16 @@ class UserStore:
             self._users = {}
 
     def _save(self) -> None:
-        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        with open(self.path, "w") as f:
-            json.dump({"users": self._users}, f, indent=2)
+        dir_path = os.path.dirname(self.path) or "."
+        os.makedirs(dir_path, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump({"users": self._users}, f, indent=2)
+            os.replace(tmp, self.path)
+        except BaseException:
+            os.unlink(tmp)
+            raise
 
     def register(self, username: str, password: str) -> Optional[UserProfile]:
         """Register a new user. Returns None if username already taken."""

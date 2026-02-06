@@ -2,6 +2,7 @@
 
 import json
 import os
+import tempfile
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -46,10 +47,17 @@ class Leaderboard:
             self._entries = {}
 
     def _save(self) -> None:
-        """Persist entries to the JSON file."""
-        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        with open(self.path, "w") as f:
-            json.dump({"songs": self._entries}, f, indent=2)
+        """Persist entries to the JSON file (atomic write)."""
+        dir_path = os.path.dirname(self.path) or "."
+        os.makedirs(dir_path, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump({"songs": self._entries}, f, indent=2)
+            os.replace(tmp, self.path)
+        except BaseException:
+            os.unlink(tmp)
+            raise
 
     def submit(self, entry: LeaderboardEntry) -> int:
         """Submit a score and return its rank (1-based) within that song.
