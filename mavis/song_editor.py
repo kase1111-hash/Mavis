@@ -6,11 +6,12 @@ and managing a community song library with ratings and moderation.
 
 import json
 import os
-import tempfile
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+from mavis.storage import atomic_json_save, locked_json_load
 
 from mavis.sheet_text import SheetTextToken, parse
 from mavis.songs import Song
@@ -154,24 +155,11 @@ class CommunityLibrary:
         self._load()
 
     def _load(self) -> None:
-        if os.path.isfile(self.path) and os.path.getsize(self.path) > 0:
-            with open(self.path, "r") as f:
-                data = json.load(f)
-            self._entries = data.get("entries", {})
-        else:
-            self._entries = {}
+        data = locked_json_load(self.path)
+        self._entries = data.get("entries", {}) if data else {}
 
     def _save(self) -> None:
-        dir_path = os.path.dirname(self.path) or "."
-        os.makedirs(dir_path, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump({"entries": self._entries}, f, indent=2)
-            os.replace(tmp, self.path)
-        except BaseException:
-            os.unlink(tmp)
-            raise
+        atomic_json_save(self.path, {"entries": self._entries})
 
     def submit(self, draft: SongDraft, author: str = "") -> CommunityEntry:
         """Submit a song to the community library. Returns the entry."""

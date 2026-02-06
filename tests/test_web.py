@@ -103,6 +103,24 @@ def test_register_and_login(client):
     assert "token" in data
 
 
+def test_profile_with_auth_header(client):
+    """Test that the Authorization header works for authenticated endpoints."""
+    import uuid
+    username = f"headeruser_{uuid.uuid4().hex[:6]}"
+    resp = client.post("/auth/register", json={
+        "username": username,
+        "password": "testpass",
+    })
+    token = resp.json()["token"]
+
+    # Access profile via Authorization header (preferred)
+    resp = client.get("/api/profile", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["username"] == username
+    assert "error" not in data
+
+
 def test_register_short_username(client):
     resp = client.post("/auth/register", json={
         "username": "a",

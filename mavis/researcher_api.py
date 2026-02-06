@@ -10,12 +10,13 @@ import hmac as _hmac_mod
 import json
 import os
 import secrets
-import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+from mavis.storage import atomic_json_save, locked_json_load
 
 
 @dataclass
@@ -69,24 +70,11 @@ class PerformanceStore:
         self._load()
 
     def _load(self) -> None:
-        if os.path.isfile(self.path) and os.path.getsize(self.path) > 0:
-            with open(self.path, "r") as f:
-                data = json.load(f)
-            self._performances = data.get("performances", {})
-        else:
-            self._performances = {}
+        data = locked_json_load(self.path)
+        self._performances = data.get("performances", {}) if data else {}
 
     def _save(self) -> None:
-        dir_path = os.path.dirname(self.path) or "."
-        os.makedirs(dir_path, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump({"performances": self._performances}, f, indent=2)
-            os.replace(tmp, self.path)
-        except BaseException:
-            os.unlink(tmp)
-            raise
+        atomic_json_save(self.path, {"performances": self._performances})
 
     def record(self, perf: AnonymizedPerformance) -> str:
         """Store a performance. Returns the performance ID."""
@@ -280,9 +268,8 @@ class APIKeyStore:
         self._load()
 
     def _load(self) -> None:
-        if os.path.isfile(self.path) and os.path.getsize(self.path) > 0:
-            with open(self.path, "r") as f:
-                data = json.load(f)
+        data = locked_json_load(self.path)
+        if data:
             self._keys = data.get("keys", {})
             # Restore persisted rate limit timestamps
             now = time.time()
@@ -293,8 +280,6 @@ class APIKeyStore:
             self._keys = {}
 
     def _save(self) -> None:
-        dir_path = os.path.dirname(self.path) or "."
-        os.makedirs(dir_path, exist_ok=True)
         # Prune stale rate limit entries before persisting
         now = time.time()
         window_start = now - 60
@@ -303,14 +288,7 @@ class APIKeyStore:
             pruned = [t for t in timestamps if t > window_start]
             if pruned:
                 rate_limits[key_id] = pruned
-        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump({"keys": self._keys, "rate_limits": rate_limits}, f, indent=2)
-            os.replace(tmp, self.path)
-        except BaseException:
-            os.unlink(tmp)
-            raise
+        atomic_json_save(self.path, {"keys": self._keys, "rate_limits": rate_limits})
 
     def register(self, owner: str) -> str:
         """Register a new API key. Returns the plaintext key."""

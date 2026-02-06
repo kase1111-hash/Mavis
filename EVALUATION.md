@@ -1,5 +1,9 @@
 # COMPREHENSIVE SOFTWARE PURPOSE & QUALITY EVALUATION
 
+> **Note:** This evaluation was generated at commit `03dbbb5`. Many of the issues
+> identified below have since been fixed. See the "Remediation Status" appendix
+> at the end for a full accounting of what has been addressed.
+
 ## Evaluation Parameters
 
 | Parameter | Value |
@@ -289,3 +293,44 @@ The core package runs on any Python 3.8+ without pip install.
 4. **Is the Prosody-Protocol SDK (`prosody-protocol` package) published and installable?** The optional integration references it, but availability is unclear.
 
 5. **What is the intended relationship between the 7-dimensional feature vector from Mavis and the intent-engine's analysis?** Both produce emotion labels through different methods. Is one intended to supersede the other?
+
+---
+
+## APPENDIX: REMEDIATION STATUS
+
+The following issues identified in this evaluation have been addressed:
+
+| # | Issue | Status | Fix |
+|---|-------|--------|-----|
+| 1 | Web server has 0 tests | **FIXED** | Added `tests/test_web.py` (27 tests) |
+| 2 | SHA-256 password hashing | **FIXED** | bcrypt with iterated HMAC-SHA256 fallback (100k rounds) |
+| 3 | Hardcoded secret fallbacks | **FIXED** | Warnings emitted when env vars unset |
+| 4 | No file locking on JSON stores | **FIXED** | `mavis/storage.py` with `fcntl.flock` + `atomic_json_save` |
+| 5 | Rate limit state in-memory only | **FIXED** | Persisted to JSON alongside API keys |
+| 6 | No WebSocket message validation | **FIXED** | Size limits + JSON validation on both WS endpoints |
+| 7 | Wrong delimiter in test | **FIXED** | `test_licensing.py:82` uses `\|` delimiter |
+| 8 | No CORS configuration | **FIXED** | `CORSMiddleware` with configurable origins |
+| 9 | No health check endpoint | **FIXED** | `GET /health` returns status + session/room counts |
+| 10 | Unused imports | **FIXED** | Removed from `export.py` and `web/server.py` |
+| 11 | Auth token in query params | **FIXED** | `Authorization: Bearer` header support added (query param kept for legacy) |
+| 12 | Web server monolith (702 lines) | **FIXED** | Split into `web/routers/auth.py`, `songs.py`, `researcher.py` |
+| 13 | No request logging | **FIXED** | HTTP middleware logs method, path, status, and duration |
+| 14 | No graceful shutdown | **FIXED** | FastAPI `lifespan` handler clears sessions/rooms on shutdown |
+| 15 | API key hashing without salt | **FIXED** | Per-key random salt added to `APIKeyStore.register()` |
+| 16 | No CI pipeline | **FIXED** | `.github/workflows/ci.yml` (pytest, ruff, mypy) |
+| 17 | README roadmap stale | **FIXED** | All 4 phases marked complete |
+| 18 | CONTRIBUTING.md missing | **FIXED** | Created with dev workflow, code style, security guidelines |
+| 19 | IMPLEMENTATION.md missing | **FIXED** | Created with architecture, security model, testing strategy |
+| 20 | No conftest.py | **FIXED** | `tests/conftest.py` with shared fixtures |
+| 21 | No atomic file writes | **FIXED** | All stores use `atomic_json_save()` (temp + `os.replace`) |
+| 22 | No rate limiting on main endpoints | **FIXED** | Per-IP rate limiting middleware (120 req/min default) |
+| 23 | `test_validate_key_wrong_signature` wrong delimiter | **FIXED** | Changed to pipe delimiter |
+
+### Remaining (out of scope for code fixes)
+
+| Issue | Reason |
+|-------|--------|
+| No real LLM/TTS integration | Requires external engine setup (espeak-ng, Coqui, etc.) |
+| No database backend | Requires PostgreSQL/SQLite deployment decision |
+| No HTTPS enforcement | Deployment concern (reverse proxy / hosting config) |
+| Single developer bus factor | Organizational concern, not a code fix |

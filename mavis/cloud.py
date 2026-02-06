@@ -11,11 +11,12 @@ import hmac
 import json
 import os
 import secrets
-import tempfile
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+from mavis.storage import atomic_json_save, locked_json_load
 
 
 # --- Data models ---
@@ -175,24 +176,11 @@ class UserStore:
         self._load()
 
     def _load(self) -> None:
-        if os.path.isfile(self.path) and os.path.getsize(self.path) > 0:
-            with open(self.path, "r") as f:
-                data = json.load(f)
-            self._users = data.get("users", {})
-        else:
-            self._users = {}
+        data = locked_json_load(self.path)
+        self._users = data.get("users", {}) if data else {}
 
     def _save(self) -> None:
-        dir_path = os.path.dirname(self.path) or "."
-        os.makedirs(dir_path, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump({"users": self._users}, f, indent=2)
-            os.replace(tmp, self.path)
-        except BaseException:
-            os.unlink(tmp)
-            raise
+        atomic_json_save(self.path, {"users": self._users})
 
     def register(self, username: str, password: str) -> Optional[UserProfile]:
         """Register a new user. Returns None if username already taken."""

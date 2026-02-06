@@ -12,6 +12,7 @@ import os
 import sys
 import time
 import uuid
+from contextlib import asynccontextmanager
 from typing import Dict, List, Optional
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -22,34 +23,53 @@ from fastapi.staticfiles import StaticFiles
 # Ensure the project root is on the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from mavis.cloud import SyncPayload, UserStore, generate_token, verify_token
 from mavis.config import LAPTOP_CPU, MavisConfig
-from mavis.leaderboard import LeaderboardEntry, get_default_leaderboard
-from mavis.licensing import LicenseManager, list_tiers
 from mavis.pipeline import create_pipeline
-from mavis.researcher_api import APIKeyStore, PerformanceStore
 from mavis.scoring import ScoreTracker
-from mavis.song_browser import browse_songs
-from mavis.song_editor import CommunityLibrary, SongDraft
 from mavis.songs import Song, list_songs
+
+from web.routers import auth, researcher, songs
 
 logger = logging.getLogger("mavis.web")
 
-app = FastAPI(title="Mavis", description="Vocal Typing Instrument - Web Interface")
+
+# --- Lifecycle (graceful shutdown) ---
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler for startup/shutdown."""
+    logger.info("Mavis web server starting up")
+    yield
+    # Cleanup on shutdown
+    logger.info("Mavis web server shutting down -- cleaning up %d sessions", len(_sessions))
+    _sessions.clear()
+    _rooms.clear()
+
+
+app = FastAPI(
+    title="Mavis",
+    description="Vocal Typing Instrument - Web Interface",
+    lifespan=lifespan,
+)
+
 
 # --- CORS Configuration ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("MAVIS_CORS_ORIGINS", "http://localhost:3000,http://localhost:8000").split(","),
+    allow_origins=os.environ.get(
+        "MAVIS_CORS_ORIGINS", "http://localhost:3000,http://localhost:8000"
+    ).split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 # --- Rate Limiting (simple in-memory, per-IP) ---
 _rate_limit_log: Dict[str, List[float]] = {}
-_RATE_LIMIT_RPM = int(os.environ.get("MAVIS_RATE_LIMIT_RPM", "120"))  # requests per minute
+_RATE_LIMIT_RPM = int(os.environ.get("MAVIS_RATE_LIMIT_RPM", "120"))
 _WS_MAX_MESSAGE_SIZE = int(os.environ.get("MAVIS_WS_MAX_MSG_SIZE", "4096"))
+
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
@@ -72,6 +92,27 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    """Log every HTTP request with method, path, status, and duration."""
+    start = time.time()
+    response = await call_next(request)
+    duration_ms = (time.time() - start) * 1000
+    logger.info(
+        "%s %s -> %d (%.1fms)",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+    return response
+
+
+# --- Mount routers ---
+app.include_router(auth.router)
+app.include_router(songs.router)
+app.include_router(researcher.router)
+
 # Mount static files
 _static_dir = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
@@ -82,7 +123,12 @@ app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring."""
-    return {"status": "ok", "service": "mavis"}
+    return {
+        "status": "ok",
+        "service": "mavis",
+        "active_sessions": len(_sessions),
+        "active_rooms": len(_rooms),
+    }
 
 
 # --- Active sessions ---
@@ -159,7 +205,7 @@ class GameSession:
 _sessions: Dict[str, GameSession] = {}
 
 
-# --- REST Endpoints ---
+# --- Serve main page ---
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
@@ -169,319 +215,19 @@ async def root():
         return HTMLResponse(content=f.read())
 
 
-@app.get("/api/songs")
-async def get_songs(difficulty: Optional[str] = None):
-    """List available songs, optionally filtered by difficulty."""
-    songs = browse_songs("songs", difficulty=difficulty)
-    return [
-        {
-            "song_id": s.song_id,
-            "title": s.title,
-            "bpm": s.bpm,
-            "difficulty": s.difficulty,
-            "token_count": len(s.tokens),
-            "sheet_text": s.sheet_text,
-        }
-        for s in songs
-    ]
+# --- WebSocket helpers ---
 
-
-@app.get("/api/songs/community")
-async def browse_community(
-    sort_by: str = "rating",
-    difficulty: Optional[str] = None,
-    limit: int = 20,
-    offset: int = 0,
-):
-    """Browse community-uploaded songs."""
-    entries = _community.browse(
-        sort_by=sort_by, difficulty=difficulty, limit=limit, offset=offset
-    )
-    return [e.to_dict() for e in entries]
-
-
-@app.get("/api/songs/{song_id}")
-async def get_song(song_id: str):
-    """Get details for a specific song."""
-    songs = list_songs("songs")
-    for s in songs:
-        if s.song_id == song_id:
-            return {
-                "song_id": s.song_id,
-                "title": s.title,
-                "bpm": s.bpm,
-                "difficulty": s.difficulty,
-                "sheet_text": s.sheet_text,
-                "token_count": len(s.tokens),
-            }
-    return {"error": "Song not found"}
-
-
-@app.get("/api/leaderboard/{song_id}")
-async def get_leaderboard(song_id: str, difficulty: Optional[str] = None, limit: int = 10):
-    """Get leaderboard for a song."""
-    lb = get_default_leaderboard()
-    scores = lb.get_scores(song_id, difficulty=difficulty, limit=limit)
-    return {"song_id": song_id, "scores": scores}
-
-
-@app.post("/api/leaderboard/{song_id}")
-async def submit_score(song_id: str, data: dict):
-    """Submit a score to the leaderboard."""
-    lb = get_default_leaderboard()
-    entry = LeaderboardEntry(
-        player_name=data.get("player_name", "WebPlayer"),
-        score=data.get("score", 0),
-        grade=data.get("grade", "F"),
-        song_id=song_id,
-        difficulty=data.get("difficulty", "medium"),
-        accuracy=data.get("accuracy", 0.0),
-    )
-    rank = lb.submit(entry)
-    return {"rank": rank, "song_id": song_id}
-
-
-# --- Auth Endpoints (Cloud Save) ---
-
-_user_store = UserStore()
-_community = CommunityLibrary()
-
-
-@app.post("/auth/register")
-async def auth_register(data: dict):
-    """Register a new user account."""
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
-    if not username or not password:
-        return {"error": "Username and password required"}
-    if len(username) < 2 or len(username) > 20:
-        return {"error": "Username must be 2-20 characters"}
-    if len(password) < 4:
-        return {"error": "Password must be at least 4 characters"}
-    profile = _user_store.register(username, password)
-    if profile is None:
-        return {"error": "Username already taken"}
-    token = generate_token(profile.user_id)
-    return {"user_id": profile.user_id, "username": profile.username, "token": token}
-
-
-@app.post("/auth/login")
-async def auth_login(data: dict):
-    """Authenticate and return a token."""
-    username = data.get("username", "")
-    password = data.get("password", "")
-    profile = _user_store.authenticate(username, password)
-    if profile is None:
-        return {"error": "Invalid credentials"}
-    token = generate_token(profile.user_id)
-    return {"user_id": profile.user_id, "username": profile.username, "token": token}
-
-
-@app.get("/api/profile")
-async def get_profile(token: str = ""):
-    """Get the authenticated user's profile."""
-    user_id = verify_token(token)
-    if user_id is None:
-        return {"error": "Invalid or expired token"}
-    profile = _user_store.get_user(user_id)
-    if profile is None:
-        return {"error": "User not found"}
-    return profile.to_dict()
-
-
-@app.put("/api/profile/voice")
-async def update_voice(data: dict):
-    """Update the user's voice preference."""
-    user_id = verify_token(data.get("token", ""))
-    if user_id is None:
-        return {"error": "Invalid or expired token"}
-    profile = _user_store.get_user(user_id)
-    if profile is None:
-        return {"error": "User not found"}
-    profile.voice_preference = data.get("voice", "default")
-    _user_store.update_user(profile)
-    return {"ok": True}
-
-
-@app.get("/api/progress")
-async def get_progress(token: str = ""):
-    """Get the user's tutorial progress and personal bests."""
-    user_id = verify_token(token)
-    if user_id is None:
-        return {"error": "Invalid or expired token"}
-    profile = _user_store.get_user(user_id)
-    if profile is None:
-        return {"error": "User not found"}
-    return {
-        "tutorial_progress": profile.tutorial_progress,
-        "personal_bests": profile.personal_bests,
-    }
-
-
-@app.put("/api/progress")
-async def sync_progress(data: dict):
-    """Sync user progress (offline-first merge)."""
-    user_id = verify_token(data.get("token", ""))
-    if user_id is None:
-        return {"error": "Invalid or expired token"}
-    payload = SyncPayload(
-        user_id=user_id,
-        voice_preference=data.get("voice_preference", "default"),
-        difficulty_preference=data.get("difficulty_preference", "medium"),
-        tutorial_progress=data.get("tutorial_progress", {}),
-        personal_bests=data.get("personal_bests", {}),
-        leaderboard_entries=data.get("leaderboard_entries", []),
-    )
-    profile = _user_store.sync(payload)
-    if profile is None:
-        return {"error": "User not found"}
-    return profile.to_dict()
-
-
-# --- Community / User-Generated Content ---
-
-@app.post("/api/songs/upload")
-async def upload_song(data: dict):
-    """Upload a community song (authenticated)."""
-    user_id = verify_token(data.get("token", ""))
-    if user_id is None:
-        return {"error": "Authentication required"}
-    profile = _user_store.get_user(user_id)
-    author = profile.username if profile else "anonymous"
-    draft = SongDraft(
-        title=data.get("title", ""),
-        bpm=data.get("bpm", 120),
-        difficulty=data.get("difficulty", "medium"),
-        sheet_text=data.get("sheet_text", ""),
-        author=author,
-        tags=data.get("tags", []),
-    )
-    errors = draft.validate()
-    if errors:
-        return {"error": errors}
-    entry = _community.submit(draft, author=author)
-    return {"entry_id": entry.entry_id, "title": draft.title}
-
-
-@app.post("/api/songs/{entry_id}/rate")
-async def rate_song(entry_id: str, data: dict):
-    """Rate a community song (1-5 stars)."""
-    rating = data.get("rating", 0)
-    if _community.rate(entry_id, rating):
-        return {"ok": True}
-    return {"error": "Invalid rating or entry not found"}
-
-
-@app.post("/api/songs/{entry_id}/flag")
-async def flag_song(entry_id: str):
-    """Flag a community song for moderation."""
-    if _community.flag(entry_id):
-        return {"ok": True}
-    return {"error": "Entry not found"}
-
-
-# --- Researcher API (Phase 4) ---
-
-_perf_store = PerformanceStore()
-_api_keys = APIKeyStore()
-_license_mgr = LicenseManager()
-
-
-def _check_api_key(api_key: str) -> Optional[str]:
-    """Validate API key and check rate limit. Returns key_id or None."""
-    key_id = _api_keys.validate(api_key)
-    if key_id is None:
-        return None
-    if not _api_keys.check_rate_limit(key_id):
-        return None
-    return key_id
-
-
-@app.post("/api/v1/register")
-async def register_api_key(data: dict):
-    """Register a new researcher API key."""
-    owner = data.get("owner", "").strip()
-    if not owner:
-        return {"error": "Owner name required"}
-    raw_key = _api_keys.register(owner)
-    return {"api_key": raw_key, "owner": owner, "rate_limit": "100 requests/minute"}
-
-
-@app.get("/api/v1/performances")
-async def list_performances(
-    api_key: str = "",
-    song_id: Optional[str] = None,
-    difficulty: Optional[str] = None,
-    min_score: Optional[int] = None,
-    limit: int = 20,
-    offset: int = 0,
-):
-    """Paginated list of anonymized performances."""
-    if not _check_api_key(api_key):
-        return {"error": "Invalid or rate-limited API key"}
-    perfs = _perf_store.query(
-        song_id=song_id, difficulty=difficulty,
-        min_score=min_score, limit=limit, offset=offset,
-    )
-    return [p.to_dict() for p in perfs]
-
-
-@app.get("/api/v1/performances/{perf_id}")
-async def get_performance(perf_id: str, api_key: str = ""):
-    """Full performance event stream."""
-    if not _check_api_key(api_key):
-        return {"error": "Invalid or rate-limited API key"}
-    perf = _perf_store.get(perf_id)
-    if perf is None:
-        return {"error": "Performance not found"}
-    return perf.to_dict()
-
-
-@app.get("/api/v1/statistics")
-async def get_statistics(api_key: str = ""):
-    """Aggregate statistics across all performances."""
-    if not _check_api_key(api_key):
-        return {"error": "Invalid or rate-limited API key"}
-    return _perf_store.statistics()
-
-
-@app.get("/api/v1/prosody-map")
-async def get_prosody_map(api_key: str = ""):
-    """Aggregated text-to-prosody mappings across all performances."""
-    if not _check_api_key(api_key):
-        return {"error": "Invalid or rate-limited API key"}
-    return _perf_store.prosody_map()
-
-
-# --- Licensing Endpoints (Phase 4) ---
-
-@app.get("/api/license/tiers")
-async def get_license_tiers():
-    """List available license tiers."""
-    return list_tiers()
-
-
-@app.get("/api/license/current")
-async def get_current_license():
-    """Get the current license status."""
-    return _license_mgr.current().to_dict()
-
-
-@app.post("/api/license/activate")
-async def activate_license(data: dict):
-    """Activate a license key."""
-    key = data.get("key", "")
-    info = _license_mgr.activate(key)
-    if info is None:
-        return {"error": "Invalid license key"}
-    return info.to_dict()
-
-
-@app.post("/api/license/deactivate")
-async def deactivate_license():
-    """Deactivate the current license."""
-    _license_mgr.deactivate()
-    return {"ok": True, "tier": "free"}
+def _validate_ws_message(raw: str):
+    """Validate a WebSocket message. Returns (msg_dict, error_response)."""
+    if len(raw) > _WS_MAX_MESSAGE_SIZE:
+        return None, {"type": "error", "message": "Message too large"}
+    try:
+        msg = json.loads(raw)
+    except json.JSONDecodeError:
+        return None, {"type": "error", "message": "Invalid JSON"}
+    if not isinstance(msg, dict):
+        return None, {"type": "error", "message": "Expected JSON object"}
+    return msg, None
 
 
 # --- WebSocket Gameplay ---
@@ -507,16 +253,9 @@ async def websocket_play(websocket: WebSocket):
     try:
         while True:
             raw = await websocket.receive_text()
-            if len(raw) > _WS_MAX_MESSAGE_SIZE:
-                await websocket.send_json({"type": "error", "message": "Message too large"})
-                continue
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
-                continue
-            if not isinstance(msg, dict):
-                await websocket.send_json({"type": "error", "message": "Expected JSON object"})
+            msg, err = _validate_ws_message(raw)
+            if err:
+                await websocket.send_json(err)
                 continue
             msg_type = msg.get("type", "")
 
@@ -527,8 +266,8 @@ async def websocket_play(websocket: WebSocket):
 
                 song_id = msg.get("song_id")
                 if song_id:
-                    songs = list_songs("songs")
-                    for s in songs:
+                    song_list = list_songs("songs")
+                    for s in song_list:
                         if s.song_id == song_id:
                             session.song = s
                             break
@@ -586,8 +325,8 @@ class MultiplayerRoom:
 
     def __init__(self, room_id: str, mode: str = "competitive"):
         self.room_id = room_id
-        self.mode = mode  # "competitive" | "duet"
-        self.players: Dict[str, dict] = {}  # ws_id -> {websocket, session}
+        self.mode = mode
+        self.players: Dict[str, dict] = {}
         self.song: Optional[Song] = None
 
     @property
@@ -611,8 +350,8 @@ async def create_room(data: dict):
 
     song_id = data.get("song_id")
     if song_id:
-        songs = list_songs("songs")
-        for s in songs:
+        song_list = list_songs("songs")
+        for s in song_list:
             if s.song_id == song_id:
                 room.song = s
                 break
@@ -666,16 +405,9 @@ async def websocket_room(websocket: WebSocket, room_id: str):
     try:
         while True:
             raw = await websocket.receive_text()
-            if len(raw) > _WS_MAX_MESSAGE_SIZE:
-                await websocket.send_json({"type": "error", "message": "Message too large"})
-                continue
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
-                continue
-            if not isinstance(msg, dict):
-                await websocket.send_json({"type": "error", "message": "Expected JSON object"})
+            msg, err = _validate_ws_message(raw)
+            if err:
+                await websocket.send_json(err)
                 continue
             msg_type = msg.get("type", "")
 
