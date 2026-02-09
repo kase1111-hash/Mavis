@@ -28,10 +28,11 @@ python3 demos/interactive_vocal_typing.py
 
 ## Project Structure
 
-- `mavis/` -- Core Python package (21 modules).
+- `mavis/` -- Core Python package (16 modules).
 - `web/` -- FastAPI web server with router modules.
-- `web/routers/` -- auth, songs/licensing, and researcher API routers.
-- `tests/` -- pytest test suite (307+ tests).
+- `web/routers/` -- songs and leaderboard router.
+- `tests/` -- pytest test suite (170 tests).
+- `_deferred/` -- Data platform features set aside for future reintegration.
 - `songs/` -- 10-song JSON library.
 - `demos/` -- Interactive and non-interactive demos.
 
@@ -63,10 +64,7 @@ See the 6-step process documented in `CLAUDE.md` under "Adding a New Sheet Text 
 
 ## Security
 
-- Never hardcode secrets. Use environment variables (`MAVIS_LICENSE_SECRET`, `MAVIS_TOKEN_SECRET`).
-- Use `hmac.compare_digest()` for all hash comparisons.
-- Use `bcrypt` for password hashing when available.
-- All web endpoints must go through the rate limiting middleware.
+- All web endpoints go through the rate limiting middleware.
 
 ## Test Guidelines
 

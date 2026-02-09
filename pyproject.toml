@@ -19,7 +19,6 @@ llm-local = ["llama-cpp-python"]
 llm-cloud = ["anthropic"]
 tts-coqui = ["TTS"]
 web = ["fastapi", "uvicorn", "websockets"]
-cloud = ["bcrypt", "python-jose", "sqlalchemy"]
 prosody = ["prosody-protocol"]
 
 [tool.pytest.ini_options]

@@ -126,9 +126,9 @@ This means:
 
 ---
 
-## Current Status: Alpha (All 4 Phases Implemented)
+## Current Status: Alpha (Core Instrument)
 
-This repo contains a **complete alpha implementation** with mock LLM/TTS backends that simulates the full pipeline across all four phases. 307 tests passing.
+This repo contains a **focused alpha implementation** of the core instrument with mock LLM/TTS backends. 170 tests passing.
 
 ### What Works
 - ✅ Full pipeline (input buffer, sheet text parser, LLM processor, output buffer, audio synthesis)
@@ -136,16 +136,11 @@ This repo contains a **complete alpha implementation** with mock LLM/TTS backend
 - ✅ 10-song library with 3 difficulty tiers and 4 difficulty presets
 - ✅ Scoring, leaderboards, 6 voice profiles, 7-lesson tutorial
 - ✅ Web interface (FastAPI + WebSocket real-time gameplay)
-- ✅ Mobile client (React Native)
-- ✅ Cloud save, multiplayer/duets, user-generated content
-- ✅ Prosody-Protocol IML export, intent-engine bridge, researcher API
-- ✅ Institutional licensing (3 tiers with HMAC-SHA256 keys)
+- ✅ Prosody-Protocol IML export (core conversion functions)
 
 ### What's Needed for Production
+- ⏳ Real TTS engine (espeak-ng, Coqui, ElevenLabs) -- stubs exist, **highest priority**
 - ⏳ Real LLM integration (Llama, Claude API) -- stubs exist
-- ⏳ Real TTS engine (espeak-ng, Coqui, ElevenLabs) -- stubs exist
-- ⏳ Production security hardening (bcrypt enforced, JWT tokens, HTTPS)
-- ⏳ Database backend (SQLite/PostgreSQL) replacing JSON file stores
 - ⏳ CI pipeline (GitHub Actions)
 
 ---
@@ -266,7 +261,6 @@ See: [`Prosody-Protocol`](https://github.com/kase1111-hash/Prosody-Protocol) and
 **Interface:**
 - Web: Browser-based (widest reach)
 - Native: Python/PyGame (lowest latency)
-- Mobile: React Native (accessibility)
 
 See [`IMPLEMENTATION.md`](./IMPLEMENTATION.md) for complete technical specs.
 
@@ -288,18 +282,13 @@ See [`IMPLEMENTATION.md`](./IMPLEMENTATION.md) for complete technical specs.
 - [x] 6 voice customization presets
 - [x] 7-lesson tutorial mode
 
-### Phase 3: Platform Launch -- COMPLETE
+### Phase 3: Web Interface -- COMPLETE
 - [x] Web version (FastAPI + WebSocket)
-- [x] Mobile client (React Native)
-- [x] Cloud save with offline-first sync
-- [x] Multiplayer/duets (competitive + duet modes)
-- [x] User-generated content (community library with ratings)
 
-### Phase 4: Ecosystem Integration -- COMPLETE
-- [x] Export to Prosody-Protocol IML + JSONL datasets
-- [x] Integration with intent-engine (prosody analysis bridge)
-- [x] Researcher API (anonymized data, API keys, rate limiting)
-- [x] Institutional licensing (Free/Institutional/Research tiers)
+### Phase 4: Make It Sing -- IN PROGRESS
+- [ ] Real TTS integration (espeak-ng or Coqui) -- make the demo produce audible singing
+- [ ] Real LLM integration (llama-cpp-python or Claude API)
+- [x] Export to Prosody-Protocol IML (core conversion functions)
 
 ---
 

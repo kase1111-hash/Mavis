@@ -14,7 +14,6 @@
             <p class="subtitle">Turn typing into singing. Your keyboard is the instrument.</p>
             <div class="menu-buttons">
                 <button onclick="showSongBrowser()">Play a Song</button>
-                <button onclick="showMultiplayer()">Multiplayer</button>
                 <button onclick="showLeaderboard()">Leaderboard</button>
                 <button onclick="showSettings()">Settings</button>
             </div>
@@ -127,28 +126,6 @@
             <button class="back-btn" onclick="showMenu()">Back</button>
         </div>
 
-        <!-- Multiplayer Screen -->
-        <div id="multiplayer-screen" class="screen">
-            <h2>Multiplayer</h2>
-            <div class="mp-options">
-                <div class="mp-create">
-                    <h3>Create Room</h3>
-                    <select id="mp-mode">
-                        <option value="competitive">Competitive</option>
-                        <option value="duet">Duet</option>
-                    </select>
-                    <select id="mp-song"></select>
-                    <button onclick="createRoom()">Create Room</button>
-                </div>
-                <div class="mp-join">
-                    <h3>Join Room</h3>
-                    <input type="text" id="room-code" placeholder="Room Code" maxlength="6">
-                    <button onclick="joinRoom()">Join</button>
-                </div>
-            </div>
-            <div id="mp-status" class="mp-status"></div>
-            <button class="back-btn" onclick="showMenu()">Back</button>
-        </div>
     </div>
 
     <script src="/static/app.js"></script>
