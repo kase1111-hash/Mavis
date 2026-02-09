@@ -332,39 +332,8 @@ button:hover {
     border-radius: 4px;
 }
 
-/* Multiplayer */
-.mp-options {
-    display: flex;
-    gap: 2rem;
-    margin-bottom: 1rem;
-}
-
-.mp-create, .mp-join {
-    flex: 1;
-    background: var(--bg-light);
-    padding: 1rem;
-    border-radius: 4px;
-}
-
-.mp-create select,
-.mp-create button,
-.mp-join input,
-.mp-join button {
-    width: 100%;
-    margin-top: 0.5rem;
-}
-
-.mp-status {
-    background: var(--bg-light);
-    padding: 1rem;
-    border-radius: 4px;
-    min-height: 2rem;
-    color: var(--text-dim);
-}
-
 /* Responsive */
 @media (max-width: 600px) {
     h1 { font-size: 2rem; }
-    .mp-options { flex-direction: column; }
     .game-header { flex-direction: column; gap: 0.5rem; }
 }

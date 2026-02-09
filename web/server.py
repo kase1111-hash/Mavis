@@ -28,7 +28,7 @@ from mavis.pipeline import create_pipeline
 from mavis.scoring import ScoreTracker
 from mavis.songs import Song, list_songs
 
-from web.routers import auth, researcher, songs
+from web.routers import songs
 
 logger = logging.getLogger("mavis.web")
 
@@ -43,7 +43,6 @@ async def lifespan(app: FastAPI):
     # Cleanup on shutdown
     logger.info("Mavis web server shutting down -- cleaning up %d sessions", len(_sessions))
     _sessions.clear()
-    _rooms.clear()
 
 
 app = FastAPI(
@@ -109,9 +108,7 @@ async def request_logging_middleware(request: Request, call_next):
 
 
 # --- Mount routers ---
-app.include_router(auth.router)
 app.include_router(songs.router)
-app.include_router(researcher.router)
 
 # Mount static files
 _static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -127,7 +124,6 @@ async def health_check():
         "status": "ok",
         "service": "mavis",
         "active_sessions": len(_sessions),
-        "active_rooms": len(_rooms),
     }
 
 
@@ -316,181 +312,6 @@ async def websocket_play(websocket: WebSocket):
     except Exception:
         if session:
             _sessions.pop(session.session_id, None)
-
-
-# --- Multiplayer WebSocket ---
-
-class MultiplayerRoom:
-    """A room for two players in competitive or duet mode."""
-
-    def __init__(self, room_id: str, mode: str = "competitive"):
-        self.room_id = room_id
-        self.mode = mode
-        self.players: Dict[str, dict] = {}
-        self.song: Optional[Song] = None
-
-    @property
-    def is_full(self) -> bool:
-        return len(self.players) >= 2
-
-    @property
-    def player_count(self) -> int:
-        return len(self.players)
-
-
-_rooms: Dict[str, MultiplayerRoom] = {}
-
-
-@app.post("/api/rooms")
-async def create_room(data: dict):
-    """Create a multiplayer room."""
-    room_id = str(uuid.uuid4())[:6]
-    mode = data.get("mode", "competitive")
-    room = MultiplayerRoom(room_id=room_id, mode=mode)
-
-    song_id = data.get("song_id")
-    if song_id:
-        song_list = list_songs("songs")
-        for s in song_list:
-            if s.song_id == song_id:
-                room.song = s
-                break
-
-    _rooms[room_id] = room
-    return {"room_id": room_id, "mode": mode}
-
-
-@app.get("/api/rooms/{room_id}")
-async def get_room(room_id: str):
-    """Get room status."""
-    room = _rooms.get(room_id)
-    if not room:
-        return {"error": "Room not found"}
-    return {
-        "room_id": room.room_id,
-        "mode": room.mode,
-        "player_count": room.player_count,
-        "is_full": room.is_full,
-        "song": room.song.title if room.song else None,
-    }
-
-
-@app.websocket("/ws/room/{room_id}")
-async def websocket_room(websocket: WebSocket, room_id: str):
-    """WebSocket endpoint for multiplayer rooms.
-
-    Protocol:
-        Client sends:
-            {"type": "join", "player_name": "Alice", "difficulty": "medium", "voice": "default"}
-            {"type": "key", "char": "a", "shift": false, "ctrl": false}
-            {"type": "tick"}
-            {"type": "leave"}
-
-        Server broadcasts to all players:
-            {"type": "player_joined", "player_name": "Alice", "player_count": 1}
-            {"type": "state", "player": "Alice", ...state fields...}
-            {"type": "opponent_state", "player": "Bob", ...state fields...}
-            {"type": "result", "scores": {...}}
-    """
-    room = _rooms.get(room_id)
-    if not room:
-        await websocket.close(code=4004, reason="Room not found")
-        return
-
-    await websocket.accept()
-    player_id = str(uuid.uuid4())[:8]
-    player_name = "Player"
-    session: Optional[GameSession] = None
-
-    try:
-        while True:
-            raw = await websocket.receive_text()
-            msg, err = _validate_ws_message(raw)
-            if err:
-                await websocket.send_json(err)
-                continue
-            msg_type = msg.get("type", "")
-
-            if msg_type == "join":
-                if room.is_full:
-                    await websocket.send_json({"type": "error", "message": "Room is full"})
-                    continue
-
-                player_name = msg.get("player_name", f"Player{room.player_count + 1}")
-                difficulty = msg.get("difficulty", "medium")
-                voice = msg.get("voice", "default")
-                session = GameSession(difficulty=difficulty, voice=voice)
-                session.song = room.song
-
-                room.players[player_id] = {
-                    "websocket": websocket,
-                    "session": session,
-                    "name": player_name,
-                }
-
-                # Notify all players
-                for pid, pdata in room.players.items():
-                    try:
-                        await pdata["websocket"].send_json({
-                            "type": "player_joined",
-                            "player_name": player_name,
-                            "player_count": room.player_count,
-                            "song": {
-                                "title": room.song.title,
-                                "sheet_text": room.song.sheet_text,
-                            } if room.song else None,
-                        })
-                    except Exception:
-                        pass
-
-            elif msg_type == "key" and session is not None:
-                char = msg.get("char", "")
-                shift = msg.get("shift", False)
-                ctrl = msg.get("ctrl", False)
-                if char:
-                    state = session.feed_char(char, shift=shift, ctrl=ctrl)
-                    state["type"] = "state"
-                    state["player"] = player_name
-                    await websocket.send_json(state)
-
-                    # Broadcast opponent state to other players
-                    opponent_state = dict(state)
-                    opponent_state["type"] = "opponent_state"
-                    for pid, pdata in room.players.items():
-                        if pid != player_id:
-                            try:
-                                await pdata["websocket"].send_json(opponent_state)
-                            except Exception:
-                                pass
-
-            elif msg_type == "tick" and session is not None:
-                state = session.tick_idle()
-                state["type"] = "state"
-                state["player"] = player_name
-                await websocket.send_json(state)
-
-            elif msg_type == "leave":
-                break
-
-    except WebSocketDisconnect:
-        pass
-    except Exception:
-        pass
-    finally:
-        if player_id in room.players:
-            del room.players[player_id]
-            # Notify remaining players
-            for pid, pdata in room.players.items():
-                try:
-                    await pdata["websocket"].send_json({
-                        "type": "player_left",
-                        "player_name": player_name,
-                        "player_count": room.player_count,
-                    })
-                except Exception:
-                    pass
-            if room.player_count == 0:
-                _rooms.pop(room_id, None)
 
 
 # --- Run directly ---
