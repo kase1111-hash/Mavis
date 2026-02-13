@@ -28,7 +28,7 @@ python3 demos/interactive_vocal_typing.py
 
 ## Project Structure
 
-- `mavis/` -- Core Python package (16 modules).
+- `mavis/` -- Core Python package.
 - `web/` -- FastAPI web server with router modules.
 - `web/routers/` -- songs and leaderboard router.
 - `tests/` -- pytest test suite (170 tests).

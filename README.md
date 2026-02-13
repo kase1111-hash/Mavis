@@ -141,7 +141,6 @@ This repo contains a **focused alpha implementation** of the core instrument wit
 ### What's Needed for Production
 - ⏳ Real TTS engine (espeak-ng, Coqui, ElevenLabs) -- stubs exist, **highest priority**
 - ⏳ Real LLM integration (Llama, Claude API) -- stubs exist
-- ⏳ CI pipeline (GitHub Actions)
 
 ---
 
@@ -151,8 +150,8 @@ This repo contains a **focused alpha implementation** of the core instrument wit
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/mavis.git
-cd mavis
+git clone https://github.com/kase1111-hash/Mavis.git
+cd Mavis
 
 # Run the pipeline demonstration
 python3 demos/vocal_typing_demo.py
@@ -230,7 +229,7 @@ Every performance generates training data for **prosody ↔ text mapping**, expo
 
 Performance data is exported via `mavis/export.py` in the Prosody-Protocol dataset format (`dataset-entry.schema.json`), with IML markup, emotion labels, and 7-dimensional training feature vectors.
 
-See: [`Prosody-Protocol`](https://github.com/kase1111-hash/Prosody-Protocol) and [`intent-engine`](https://github.com/yourusername/intent-engine)
+See: [`Prosody-Protocol`](https://github.com/kase1111-hash/Prosody-Protocol)
 
 ---
 
@@ -322,8 +321,8 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for guidelines.
 Part of the **Natural Language Ecosystem:**
 
 - **[Prosody-Protocol](https://github.com/kase1111-hash/Prosody-Protocol)** - IML specification, JSON schemas, Python SDK, and training infrastructure. Mavis exports performance data to this format.
-- **[intent-engine](https://github.com/yourusername/intent-engine)** - Prosody-aware AI system (consumes IML from Prosody-Protocol)
-- **[Agent-OS](https://github.com/yourusername/agent-os)** - Constitutional AI governance (uses intent-engine)
+- **intent-engine** - Prosody-aware AI system (consumes IML from Prosody-Protocol)
+- **Agent-OS** - Constitutional AI governance (uses intent-engine)
 
 ---
 
