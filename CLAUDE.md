@@ -24,7 +24,8 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │   ├── difficulty.py             # Difficulty presets and settings (Phase 2)
 │   ├── leaderboard.py            # Local JSON leaderboard storage (Phase 2)
 │   ├── voice.py                  # Voice profile presets and persistence (Phase 2)
-│   └── tutorial.py               # 7-lesson tutorial with progress tracking (Phase 2)
+│   ├── tutorial.py               # 7-lesson tutorial with progress tracking (Phase 2)
+│   └── storage.py                # Atomic JSON file I/O with file locking
 ├── web/                          # FastAPI web interface
 │   ├── __init__.py
 │   ├── server.py                 # REST API + WebSocket gameplay
@@ -61,6 +62,7 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │   ├── test_leaderboard.py
 │   ├── test_voice.py
 │   ├── test_tutorial.py
+│   ├── test_storage.py
 │   └── test_web.py
 ├── demos/
 │   ├── vocal_typing_demo.py      # Non-interactive pipeline visualization
@@ -76,11 +78,18 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │   ├── dont_stop.json            # Hard: Don't Stop Believin' (Excerpt)
 │   ├── nessun_dorma.json         # Hard: Nessun Dorma (Excerpt)
 │   └── rap_god.json              # Hard: Rap God (Excerpt)
+├── .github/
+│   └── workflows/
+│       └── ci.yml                # CI: tests, lint (ruff), type check (mypy)
 ├── pyproject.toml                # Python packaging config
 ├── .gitignore
 ├── README.md
 ├── spec.md
 ├── EXECUTION_GUIDE.md
+├── IMPLEMENTATION.md             # Architecture and implementation notes
+├── CONTRIBUTING.md               # Contributor guidelines
+├── EVALUATION.md
+├── CONCEPT_EXECUTION_EVALUATION.md
 ├── LICENSE
 └── CLAUDE.md                     # This file
 ```
@@ -250,7 +259,7 @@ uvicorn web.server:app --reload --port 8000
 - Follow the data models in `spec.md` Section 7 and the dataclasses in `mavis/llm_processor.py` and `mavis/output_buffer.py`.
 - Demo scripts live in `demos/`. Songs live in `songs/` as JSON files.
 - All export output must conform to the Prosody-Protocol schemas at https://github.com/kase1111-hash/Prosody-Protocol/tree/main/schemas.
-- The README references `IMPLEMENTATION.md` and `CONTRIBUTING.md` which do not exist yet.
+- See `IMPLEMENTATION.md` for architecture notes and `CONTRIBUTING.md` for contributor guidelines.
 
 ## Adding a New Sheet Text Markup
 

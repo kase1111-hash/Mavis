@@ -6,14 +6,12 @@ Mavis follows a layered architecture with zero circular dependencies:
 
 ```
 Layer 0 (Foundation):    sheet_text, config, input_buffer, difficulty,
-                         voice, leaderboard, tutorial, licensing, cloud,
-                         researcher_api, storage
+                         voice, leaderboard, tutorial, storage
 
 Layer 1 (Processing):    llm_processor, output_buffer, audio, scoring,
                          songs, song_browser
 
-Layer 2 (Orchestration): pipeline, multiplayer, export, intent_bridge,
-                         song_editor
+Layer 2 (Orchestration): pipeline, export
 
 Layer 3 (Presentation):  web/server.py + web/routers/
 ```
@@ -52,31 +50,8 @@ All `*Store` classes use a shared pattern via `mavis/storage.py`:
 This provides crash safety (incomplete writes don't corrupt the target file) and basic concurrency protection (advisory file locking prevents simultaneous writers).
 
 Storage files live in `~/.mavis/`:
-- `users.json` -- User accounts and preferences.
 - `leaderboards.json` -- High scores per song.
-- `community.json` -- Community-uploaded songs.
-- `performances.json` -- Anonymized performance data.
-- `api_keys.json` -- Researcher API keys and rate limit state.
-- `license.json` -- Current license activation state.
 - `voice.json` -- Voice profile preference.
-
-## Security Model
-
-### Authentication
-- Passwords: bcrypt (preferred) or iterated HMAC-SHA256 (100k rounds fallback).
-- Tokens: HMAC-SHA256 with configurable TTL, verified via `hmac.compare_digest`.
-- API keys: Salted SHA-256 hashing, sliding-window rate limiting (100 req/min).
-
-### Web Server
-- CORS: Configurable via `MAVIS_CORS_ORIGINS` environment variable.
-- Rate limiting: Per-IP, 120 requests/minute (configurable via `MAVIS_RATE_LIMIT_RPM`).
-- WebSocket: Message size limits (4KB default), JSON validation on every message.
-- Auth: `Authorization: Bearer <token>` header (preferred), query param (legacy).
-
-### Licensing
-- License keys: `tier|institution|expiry|hmac_sig` with HMAC-SHA256 signatures.
-- Secret: `MAVIS_LICENSE_SECRET` environment variable (warns if unset).
-- Offline grace: 7 days continued use without license server contact.
 
 ## Prosody-Protocol Integration
 
@@ -92,14 +67,17 @@ The `prosody_protocol` SDK is optional. When installed, IML validation delegates
 
 The FastAPI server is split into router modules:
 
-- `web/server.py` -- App setup, middleware (CORS, rate limiting, logging), health check, WebSocket gameplay, multiplayer rooms.
-- `web/routers/auth.py` -- Registration, login, profile, progress sync.
-- `web/routers/songs.py` -- Song browsing, community UGC, leaderboards, licensing.
-- `web/routers/researcher.py` -- Anonymized performance API with API key auth.
+- `web/server.py` -- App setup, middleware (CORS, rate limiting, logging), health check, WebSocket gameplay.
+- `web/routers/songs.py` -- Song browsing and leaderboard endpoints.
+
+Middleware:
+- CORS: Configurable via `MAVIS_CORS_ORIGINS` environment variable.
+- Rate limiting: Per-IP, 120 requests/minute (configurable via `MAVIS_RATE_LIMIT_RPM`).
+- WebSocket: JSON validation on every message.
 
 ## Testing Strategy
 
-- **307 tests** across 24 test files.
+- **170 tests** across 17 test files.
 - Domain mock objects (`MockLLMProcessor`, `MockAudioSynthesizer`) instead of `unittest.mock`.
 - Persistence tests use `tempfile` with `try/finally` cleanup.
 - Shared fixtures in `tests/conftest.py`.
