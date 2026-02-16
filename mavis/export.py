@@ -176,16 +176,27 @@ def tokens_to_iml(tokens: List[SheetTextToken], language: str = "en-US") -> str:
     for token in tokens:
         text = _escape_xml(token.text)
 
-        if token.emphasis in _EMPHASIS_TO_IML and token.emphasis != "none":
+        has_prosody = token.emphasis in _EMPHASIS_TO_IML and token.emphasis != "none"
+        has_emphasis = token.emphasis in _EMPHASIS_TO_LEVEL
+
+        if has_prosody:
             attrs = _EMPHASIS_TO_IML[token.emphasis]
             attr_str = " ".join(f'{k}="{v}"' for k, v in attrs.items())
-            parts.append(f"    <prosody {attr_str}>{text}</prosody>")
-        else:
-            parts.append(f"    {text}")
-
-        if token.emphasis in _EMPHASIS_TO_LEVEL:
+            if has_emphasis:
+                level = _EMPHASIS_TO_LEVEL[token.emphasis]
+                # Nest <emphasis> inside <prosody> so text appears only once
+                parts.append(
+                    f'    <prosody {attr_str}>'
+                    f'<emphasis level="{level}">{text}</emphasis>'
+                    f"</prosody>"
+                )
+            else:
+                parts.append(f"    <prosody {attr_str}>{text}</prosody>")
+        elif has_emphasis:
             level = _EMPHASIS_TO_LEVEL[token.emphasis]
             parts.append(f'    <emphasis level="{level}">{text}</emphasis>')
+        else:
+            parts.append(f"    {text}")
 
         if token.sustain:
             duration_ms = int(token.duration_modifier * 400)

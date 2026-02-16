@@ -62,8 +62,11 @@ def test_tokens_to_iml_prosody_tags():
 def test_tokens_to_iml_emphasis_tags():
     tokens = _make_tokens()
     iml = tokens_to_iml(tokens)
-    # "SUN" is loud -> emphasis level "moderate"
+    # "SUN" is loud -> emphasis level "moderate" nested inside <prosody>
     assert '<emphasis level="moderate">' in iml
+    # Text must appear only once per token -- emphasis is nested inside prosody,
+    # not emitted as a separate sibling element.
+    assert iml.count("SUN") == 1
 
 
 def test_tokens_to_iml_pause_for_sustain():
@@ -79,6 +82,9 @@ def test_tokens_to_iml_soft():
     iml = tokens_to_iml(tokens)
     assert 'quality="breathy"' in iml
     assert 'volume="-6dB"' in iml
+    # Soft has both prosody and emphasis -- text must appear only once
+    assert '<emphasis level="reduced">' in iml
+    assert iml.count("gently") == 1
 
 
 def test_tokens_to_iml_shout():
@@ -87,6 +93,8 @@ def test_tokens_to_iml_shout():
     assert 'volume="+12dB"' in iml
     assert 'quality="tense"' in iml
     assert '<emphasis level="strong">' in iml
+    # Text must appear only once -- emphasis nested inside prosody
+    assert iml.count("STOP") == 1
 
 
 def test_phoneme_events_to_iml():
