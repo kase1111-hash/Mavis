@@ -3,7 +3,7 @@
 import time
 from typing import Dict, List, Optional
 
-from mavis.audio import AudioSynthesizer, MockAudioSynthesizer
+from mavis.audio import AudioSynthesizer, EspeakSynthesizer, MockAudioSynthesizer
 from mavis.config import MavisConfig
 from mavis.difficulty import DifficultySettings, get_difficulty
 from mavis.export import PerformanceRecording
@@ -226,6 +226,8 @@ def _create_llm(backend: str) -> LLMProcessor:
 def _create_audio(backend: str) -> AudioSynthesizer:
     if backend == "mock":
         return MockAudioSynthesizer()
+    if backend == "espeak":
+        return EspeakSynthesizer()
     raise ValueError(f"Unknown TTS backend: {backend!r}")
 
 

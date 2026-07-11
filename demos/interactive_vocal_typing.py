@@ -279,10 +279,17 @@ def tutorial_menu(stdscr):
 
 def play_game(stdscr, song, difficulty_name="medium", voice_name="default"):
     """Run the main gameplay loop for a song or tutorial lesson."""
+    # Real speech (and local playback via aplay) when espeak-ng is
+    # installed; MAVIS_TTS_BACKEND=mock forces the sine-wave synthesizer.
+    import shutil
+    tts_backend = os.environ.get(
+        "MAVIS_TTS_BACKEND",
+        "espeak" if shutil.which("espeak-ng") else "mock",
+    )
     config = MavisConfig(
         hardware=LAPTOP_CPU,
         llm_backend="mock",
-        tts_backend="mock",
+        tts_backend=tts_backend,
         difficulty_name=difficulty_name,
         voice_name=voice_name,
     )

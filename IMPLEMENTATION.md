@@ -37,8 +37,9 @@ The LLM and TTS engines use mock implementations:
 
 - `MockLLMProcessor` -- Hardcoded ~50-word English-to-phoneme dictionary with prosody mapping.
 - `MockAudioSynthesizer` -- Generates sine waves at the specified pitch/volume.
+- `EspeakSynthesizer` -- Real speech via the espeak-ng CLI: renders each phoneme in Kirshenbaum notation, resamples to the exact target pitch (using a measured pitch-parameter curve), trims/loops to the event duration, and applies vibrato (tremolo), breathiness (noise blend), and harmony (pitched copies). Auto-selected by the web server and interactive demo when the espeak-ng binary is installed.
 
-Stubs exist for real backends (llama-cpp-python, Claude API, espeak-ng, Coqui TTS) but are not yet integrated.
+Stubs exist for the remaining backends (llama-cpp-python, Claude API, Coqui TTS) but are not yet integrated.
 
 ## File Persistence
 
@@ -77,7 +78,7 @@ Middleware:
 
 ## Testing Strategy
 
-- **178 tests** across 17 test files.
+- **187 tests** across 17 test files.
 - Domain mock objects (`MockLLMProcessor`, `MockAudioSynthesizer`) instead of `unittest.mock`.
 - Persistence tests use `tempfile` with `try/finally` cleanup.
 - Shared fixtures in `tests/conftest.py`.

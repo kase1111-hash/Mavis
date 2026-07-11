@@ -128,7 +128,7 @@ This means:
 
 ## Current Status: Alpha (Core Instrument)
 
-This repo contains a **focused alpha implementation** of the core instrument with mock LLM/TTS backends. 178 tests passing.
+This repo contains a **focused alpha implementation** of the core instrument with a mock LLM backend and real speech synthesis via espeak-ng (sine-wave mock fallback). 187 tests passing.
 
 ### What Works
 - ✅ Full pipeline (input buffer, sheet text parser, LLM processor, output buffer, audio synthesis)
@@ -139,7 +139,7 @@ This repo contains a **focused alpha implementation** of the core instrument wit
 - ✅ Prosody-Protocol IML export (core conversion functions)
 
 ### What's Needed for Production
-- ⏳ Real TTS engine (espeak-ng, Coqui, ElevenLabs) -- stubs exist, **highest priority**
+- ✅ Real TTS engine (espeak-ng, pitch-tracked singing voice); Coqui/ElevenLabs still stubs
 - ⏳ Real LLM integration (Llama, Claude API) -- stubs exist
 
 ---
@@ -285,7 +285,7 @@ See [`IMPLEMENTATION.md`](./IMPLEMENTATION.md) for complete technical specs.
 - [x] Web version (FastAPI + WebSocket)
 
 ### Phase 4: Make It Sing -- IN PROGRESS
-- [ ] Real TTS integration (espeak-ng or Coqui) -- make the demo produce audible singing
+- [x] Real TTS integration (espeak-ng) -- pitch-tracked singing voice, auto-detected when installed
 - [ ] Real LLM integration (llama-cpp-python or Claude API)
 - [x] Export to Prosody-Protocol IML (core conversion functions)
 

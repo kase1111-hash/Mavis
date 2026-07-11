@@ -132,6 +132,12 @@ async def health_check():
 
 # --- Active sessions ---
 
+def _default_tts_backend() -> str:
+    """Prefer real speech via espeak-ng when the binary is present."""
+    import shutil
+    return "espeak" if shutil.which("espeak-ng") else "mock"
+
+
 class GameSession:
     """A per-client game session holding the pipeline and scoring state."""
 
@@ -140,7 +146,9 @@ class GameSession:
         self.config = MavisConfig(
             hardware=LAPTOP_CPU,
             llm_backend="mock",
-            tts_backend="mock",
+            # Real speech when espeak-ng is installed; MAVIS_TTS_BACKEND=mock
+            # forces the sine-wave synthesizer.
+            tts_backend=os.environ.get("MAVIS_TTS_BACKEND", _default_tts_backend()),
             difficulty_name=difficulty,
             voice_name=voice,
         )

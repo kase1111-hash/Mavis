@@ -15,7 +15,7 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │   ├── config.py                 # Hardware profiles and MavisConfig
 │   ├── llm_processor.py          # LLM phoneme processor (mock + stubs)
 │   ├── output_buffer.py          # Phoneme output buffer (game mechanic)
-│   ├── audio.py                  # Audio synthesis (mock + stubs)
+│   ├── audio.py                  # Audio synthesis (espeak-ng + mock)
 │   ├── pipeline.py               # Pipeline orchestrator (wires all components)
 │   ├── scoring.py                # Score tracker and grading
 │   ├── songs.py                  # Song loader (JSON -> Song dataclass)
@@ -46,7 +46,7 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │       ├── test_researcher_api.py
 │       ├── test_intent_bridge.py
 │       └── test_export_phase4.py
-├── tests/                        # pytest test suite (178 tests)
+├── tests/                        # pytest test suite (187 tests)
 │   ├── test_input_buffer.py
 │   ├── test_sheet_text.py
 │   ├── test_config.py
@@ -143,6 +143,7 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 - REST endpoints: `GET /api/songs`, `GET /api/songs/{song_id}`, `GET /api/leaderboard/{song_id}`, `POST /api/leaderboard/{song_id}`.
 - **Static frontend**: single-page app with 5 screens (menu, song browser, game, results, leaderboard, settings). Dark theme, monospace design.
 - Run with: `uvicorn web.server:app --reload` (requires `pip install mavis[web]`).
+- TTS backend auto-selects espeak-ng when the binary is installed; set `MAVIS_TTS_BACKEND=mock` to force sine waves.
 
 ## Deferred Features
 
@@ -214,11 +215,11 @@ Install with `pip install prosody-protocol` or `pip install mavis[prosody]`. Whe
 - **Language**: Python 3.8+
 - **Packaging**: pyproject.toml with optional dependency groups
 - **LLM**: MockLLMProcessor (working), llama-cpp-python and Claude API (stubs)
-- **TTS**: MockAudioSynthesizer (sine waves, working), espeak-ng and Coqui (stubs)
+- **TTS**: EspeakSynthesizer (real speech via espeak-ng, pitch-tracked for singing), MockAudioSynthesizer (sine waves), Coqui (stub)
 - **Web**: FastAPI + WebSocket (real-time gameplay), static HTML/JS frontend
 - **Interface**: curses (working terminal demo with menus)
 - **Data format**: Prosody-Protocol IML 1.0 (XML) + dataset-entry JSON schema
-- **Testing**: pytest (178 tests passing)
+- **Testing**: pytest (187 tests passing)
 
 ## Development Commands
 
