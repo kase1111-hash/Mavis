@@ -128,7 +128,7 @@ This means:
 
 ## Current Status: Alpha (Core Instrument)
 
-This repo contains a **focused alpha implementation** of the core instrument with mock LLM/TTS backends. 170 tests passing.
+This repo contains a **focused alpha implementation** of the core instrument with real grapheme-to-phoneme conversion and speech synthesis via espeak-ng (with mock fallbacks), plus optional Claude API and llama-cpp G2P backends. 204 tests passing.
 
 ### What Works
 - ✅ Full pipeline (input buffer, sheet text parser, LLM processor, output buffer, audio synthesis)
@@ -139,8 +139,8 @@ This repo contains a **focused alpha implementation** of the core instrument wit
 - ✅ Prosody-Protocol IML export (core conversion functions)
 
 ### What's Needed for Production
-- ⏳ Real TTS engine (espeak-ng, Coqui, ElevenLabs) -- stubs exist, **highest priority**
-- ⏳ Real LLM integration (Llama, Claude API) -- stubs exist
+- ✅ Real TTS engine (espeak-ng, pitch-tracked singing voice); Coqui/ElevenLabs still stubs
+- ✅ Real G2P (espeak-ng, any English word) with optional Claude API / llama-cpp backends
 
 ---
 
@@ -268,7 +268,7 @@ See [`IMPLEMENTATION.md`](./IMPLEMENTATION.md) for complete technical specs.
 ## Roadmap
 
 ### Phase 1: Playable Alpha -- COMPLETE
-- [x] LLM integration (mock + stubs for Llama/Claude)
+- [x] LLM integration (espeak-ng G2P, Claude API, llama-cpp, mock)
 - [x] TTS integration (mock sine-wave synthesis + stubs)
 - [x] Visual sustain bars
 - [x] 10 playable songs across 3 difficulty tiers
@@ -285,8 +285,8 @@ See [`IMPLEMENTATION.md`](./IMPLEMENTATION.md) for complete technical specs.
 - [x] Web version (FastAPI + WebSocket)
 
 ### Phase 4: Make It Sing -- IN PROGRESS
-- [ ] Real TTS integration (espeak-ng or Coqui) -- make the demo produce audible singing
-- [ ] Real LLM integration (llama-cpp-python or Claude API)
+- [x] Real TTS integration (espeak-ng) -- pitch-tracked singing voice, auto-detected when installed
+- [x] Real LLM integration (Claude API + llama-cpp-python, with espeak-ng G2P as the offline default)
 - [x] Export to Prosody-Protocol IML (core conversion functions)
 
 ---

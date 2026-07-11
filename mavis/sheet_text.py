@@ -1,6 +1,6 @@
 """Sheet Text parser -- converts raw buffered characters into structured tokens."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List
 
 

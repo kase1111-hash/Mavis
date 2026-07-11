@@ -8,7 +8,6 @@ from mavis.difficulty import (
     EXPERT,
     HARD,
     MEDIUM,
-    DifficultySettings,
     get_difficulty,
     list_difficulties,
 )

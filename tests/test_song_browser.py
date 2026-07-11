@@ -1,6 +1,5 @@
 """Tests for mavis.song_browser."""
 
-import os
 
 from mavis.song_browser import (
     browse_songs,

@@ -1,6 +1,5 @@
 """Tests for mavis.leaderboard."""
 
-import json
 import os
 import tempfile
 

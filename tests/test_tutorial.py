@@ -2,7 +2,6 @@
 
 from mavis.tutorial import (
     LESSONS,
-    TutorialLesson,
     TutorialProgress,
     TutorialStep,
     format_lesson_list,
@@ -15,7 +14,7 @@ def test_lesson_count():
 
 
 def test_lesson_ids_sequential():
-    ids = [l.lesson_id for l in LESSONS]
+    ids = [lesson.lesson_id for lesson in LESSONS]
     assert ids == list(range(1, 8))
 
 

@@ -4,7 +4,6 @@ import json
 import os
 import tempfile
 
-import pytest
 
 from mavis.storage import atomic_json_save, locked_json_load, locked_open
 

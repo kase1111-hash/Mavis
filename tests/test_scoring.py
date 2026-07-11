@@ -81,3 +81,33 @@ def test_reset():
     tracker.reset()
     assert tracker.score() == 0
     assert tracker.grade() == "F"
+
+
+def test_from_difficulty_uses_preset_points():
+    from mavis.difficulty import EXPERT
+    tracker = ScoreTracker.from_difficulty(EXPERT)
+    for _ in range(10):
+        tracker.on_tick(_buf("optimal"))
+    assert tracker.score() == 10 * EXPERT.tick_points_optimal
+
+
+def test_from_difficulty_underflow_penalty():
+    from mavis.difficulty import EASY, HARD
+    easy = ScoreTracker.from_difficulty(EASY)
+    hard = ScoreTracker.from_difficulty(HARD)
+    for tracker in (easy, hard):
+        for _ in range(10):
+            tracker.on_tick(_buf("optimal"))
+        for _ in range(10):
+            tracker.on_tick(_buf("underflow"))
+    # Hard's harsher underflow penalty must cost more points
+    assert easy.score() > hard.score()
+
+
+def test_token_bonus_multiplier():
+    plain = ScoreTracker()
+    doubled = ScoreTracker(token_bonus_multiplier=2.0)
+    t = _token(emphasis="loud")
+    plain.on_token(t, t)
+    doubled.on_token(t, t)
+    assert doubled.score() == 2 * plain.score()

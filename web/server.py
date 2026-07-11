@@ -6,6 +6,8 @@ Run with:
     python -m web.server
 """
 
+import asyncio
+import base64
 import json
 import logging
 import os
@@ -23,7 +25,9 @@ from fastapi.staticfiles import StaticFiles
 # Ensure the project root is on the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from mavis.audio import SAMPLE_RATE
 from mavis.config import LAPTOP_CPU, MavisConfig
+from mavis.difficulty import get_difficulty
 from mavis.pipeline import create_pipeline
 from mavis.scoring import ScoreTracker
 from mavis.songs import Song, list_songs
@@ -129,6 +133,22 @@ async def health_check():
 
 # --- Active sessions ---
 
+def _default_tts_backend() -> str:
+    """Prefer real speech via espeak-ng when the binary is present."""
+    import shutil
+    return "espeak" if shutil.which("espeak-ng") else "mock"
+
+
+def _default_llm_backend() -> str:
+    """Prefer real G2P via espeak-ng when the binary is present.
+
+    The "claude" and "llama" backends are opt-in (MAVIS_LLM_BACKEND) since
+    they need an API key or a local model file.
+    """
+    import shutil
+    return "espeak" if shutil.which("espeak-ng") else "mock"
+
+
 class GameSession:
     """A per-client game session holding the pipeline and scoring state."""
 
@@ -136,54 +156,50 @@ class GameSession:
         self.session_id = str(uuid.uuid4())[:8]
         self.config = MavisConfig(
             hardware=LAPTOP_CPU,
-            llm_backend="mock",
-            tts_backend="mock",
+            # Real G2P when espeak-ng is installed; MAVIS_LLM_BACKEND
+            # overrides (e.g. "claude" for API-based conversion, "mock").
+            llm_backend=os.environ.get("MAVIS_LLM_BACKEND", _default_llm_backend()),
+            # Real speech when espeak-ng is installed; MAVIS_TTS_BACKEND=mock
+            # forces the sine-wave synthesizer.
+            tts_backend=os.environ.get("MAVIS_TTS_BACKEND", _default_tts_backend()),
             difficulty_name=difficulty,
             voice_name=voice,
         )
         self.pipeline = create_pipeline(self.config)
-        self.tracker = ScoreTracker()
+        try:
+            self.tracker = ScoreTracker.from_difficulty(get_difficulty(difficulty))
+        except KeyError:
+            self.tracker = ScoreTracker()
         self.song: Optional[Song] = None
         self.phonemes_played = 0
         self.chars_typed = 0
 
     def feed_char(self, char: str, shift: bool = False, ctrl: bool = False):
-        """Feed a character and tick the pipeline. Returns state dict."""
+        """Feed a character into the pipeline. Returns state dict.
+
+        Keystrokes advance the pipeline with zero elapsed time: real time
+        (and therefore buffer drain and scoring) is driven exclusively by
+        the client's ~30fps idle ticks, so typing speed never changes the
+        drain rate.
+        """
         mods = {"shift": shift, "ctrl": ctrl, "alt": False}
         self.pipeline.feed(char, mods)
         self.chars_typed += 1
 
-        state = self.pipeline.tick()
-        buf_state = self.pipeline.output_buffer.state()
-        self.tracker.on_tick(buf_state)
-
-        if state["last_phoneme"]:
-            self.phonemes_played += 1
-
-        return {
-            "input_level": state["input_buffer_level"],
-            "input_size": state["input_buffer_size"],
-            "output_level": state["output_buffer_level"],
-            "output_status": state["output_buffer_status"],
-            "output_size": state["output_buffer_size"],
-            "last_phoneme": state["last_phoneme"],
-            "last_tokens": state["last_tokens"],
-            "score": self.tracker.score(),
-            "grade": self.tracker.grade(),
-            "phonemes_played": self.phonemes_played,
-            "chars_typed": self.chars_typed,
-        }
+        state = self.pipeline.tick(elapsed_ms=0)
+        return self._response(state)
 
     def tick_idle(self):
-        """Tick the pipeline without input (drain buffer)."""
-        state = self.pipeline.tick()
-        buf_state = self.pipeline.output_buffer.state()
-        self.tracker.on_tick(buf_state)
+        """Advance the pipeline by one ~30fps frame of real time."""
+        state = self.pipeline.tick(elapsed_ms=33)
+        # Don't penalize the empty buffer before the player starts typing.
+        if self.chars_typed > 0:
+            self.tracker.on_tick(self.pipeline.output_buffer.state())
+        return self._response(state)
 
-        if state["last_phoneme"]:
-            self.phonemes_played += 1
-
-        return {
+    def _response(self, state: Dict) -> Dict:
+        self.phonemes_played += state["phonemes_popped"]
+        resp = {
             "input_level": state["input_buffer_level"],
             "input_size": state["input_buffer_size"],
             "output_level": state["output_buffer_level"],
@@ -196,6 +212,11 @@ class GameSession:
             "phonemes_played": self.phonemes_played,
             "chars_typed": self.chars_typed,
         }
+        audio = self.pipeline.take_audio()
+        if audio:
+            resp["audio"] = base64.b64encode(audio).decode("ascii")
+            resp["sample_rate"] = SAMPLE_RATE
+        return resp
 
 
 _sessions: Dict[str, GameSession] = {}
@@ -267,6 +288,15 @@ async def websocket_play(websocket: WebSocket):
                         if s.song_id == song_id:
                             session.song = s
                             break
+
+                # Network-backed G2P (claude): resolve the whole song's
+                # vocabulary in one batch call up front so gameplay ticks
+                # never wait on the API.
+                if session.song is not None and hasattr(session.pipeline.llm, "prewarm"):
+                    words = [t.text for t in session.song.tokens]
+                    await asyncio.get_event_loop().run_in_executor(
+                        None, session.pipeline.llm.prewarm, words
+                    )
 
                 _sessions[session.session_id] = session
                 await websocket.send_json({

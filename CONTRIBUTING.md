@@ -31,7 +31,7 @@ python3 demos/interactive_vocal_typing.py
 - `mavis/` -- Core Python package.
 - `web/` -- FastAPI web server with router modules.
 - `web/routers/` -- songs and leaderboard router.
-- `tests/` -- pytest test suite (170 tests).
+- `tests/` -- pytest test suite (204 tests).
 - `_deferred/` -- Data platform features set aside for future reintegration.
 - `songs/` -- 10-song JSON library.
 - `demos/` -- Interactive and non-interactive demos.

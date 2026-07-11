@@ -136,3 +136,27 @@ def test_websocket_message_too_large(client):
         resp = ws.receive_json()
         assert resp["type"] == "error"
         assert "too large" in resp["message"].lower()
+
+
+def test_websocket_streams_audio(client):
+    """Idle ticks after typing must eventually deliver PCM audio."""
+    with client.websocket_connect("/ws/play") as ws:
+        ws.send_text(json.dumps({"type": "start", "difficulty": "medium"}))
+        assert ws.receive_json()["type"] == "started"
+
+        for ch in "twinkle twinkle ":
+            ws.send_text(json.dumps({"type": "key", "char": ch}))
+            ws.receive_json()
+
+        got_audio = False
+        phonemes_played = 0
+        # 60 ticks x 33ms = ~2s of game time -> several phonemes drained
+        for _ in range(60):
+            ws.send_text(json.dumps({"type": "tick"}))
+            msg = ws.receive_json()
+            phonemes_played = msg["phonemes_played"]
+            if msg.get("audio"):
+                got_audio = True
+                assert msg["sample_rate"] == 22050
+        assert got_audio
+        assert phonemes_played > 0

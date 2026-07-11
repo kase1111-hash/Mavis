@@ -1,6 +1,5 @@
 """Leaderboard -- local JSON-based high score storage."""
 
-import json
 import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone

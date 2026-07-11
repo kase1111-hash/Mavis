@@ -33,12 +33,16 @@ Buffer management is the core gameplay mechanic. The output buffer has three zon
 
 ## Mock Backends
 
-The LLM and TTS engines use mock implementations:
+Available engine implementations:
 
+- `EspeakPhonemeProcessor` -- Real grapheme-to-phoneme conversion via `espeak-ng -x` (any English word, offline, cached); the default when the binary is installed.
+- `ClaudeLLMProcessor` -- G2P via the Anthropic Claude API: one batched structured-output request per new vocabulary, cached, validated against the singable phoneme inventory, with local fallback on any API failure. Opt-in via `MAVIS_LLM_BACKEND=claude`.
+- `LlamaLLMProcessor` -- Same behavior against a local GGUF model via llama-cpp-python.
 - `MockLLMProcessor` -- Hardcoded ~50-word English-to-phoneme dictionary with prosody mapping.
 - `MockAudioSynthesizer` -- Generates sine waves at the specified pitch/volume.
+- `EspeakSynthesizer` -- Real speech via the espeak-ng CLI: renders each phoneme in Kirshenbaum notation, resamples to the exact target pitch (using a measured pitch-parameter curve), trims/loops to the event duration, and applies vibrato (tremolo), breathiness (noise blend), and harmony (pitched copies). Auto-selected by the web server and interactive demo when the espeak-ng binary is installed.
 
-Stubs exist for real backends (llama-cpp-python, Claude API, espeak-ng, Coqui TTS) but are not yet integrated.
+The only remaining stub is Coqui TTS.
 
 ## File Persistence
 
@@ -77,7 +81,7 @@ Middleware:
 
 ## Testing Strategy
 
-- **170 tests** across 17 test files.
+- **204 tests** across 17 test files.
 - Domain mock objects (`MockLLMProcessor`, `MockAudioSynthesizer`) instead of `unittest.mock`.
 - Persistence tests use `tempfile` with `try/finally` cleanup.
 - Shared fixtures in `tests/conftest.py`.

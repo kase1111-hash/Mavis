@@ -164,7 +164,7 @@ Purpose: Central configuration for hardware profiles, buffer sizes, and latency 
 - Dataclass `MavisConfig`:
   - `hardware: HardwareProfile`
   - `input_buffer_capacity: int` (default 256)
-  - `output_buffer_capacity: int` (default 128)
+  - `output_buffer_capacity: int` (default 32)
   - `llm_backend: str` ("mock" | "llama" | "claude")
   - `tts_backend: str` ("mock" | "espeak" | "coqui" | "elevenlabs")
 
@@ -309,7 +309,9 @@ Purpose: Wire InputBuffer -> SheetTextParser -> LLMProcessor -> OutputBuffer -> 
     2. Parse consumed characters into Sheet Text tokens.
     3. Send tokens to LLM processor, get phoneme events.
     4. Push phoneme events into output buffer.
-    5. If output buffer has events, pop one and synthesize audio.
+    5. Drain events from the output buffer at `drain_rate` phonemes per
+       second of elapsed time (base rate x difficulty multiplier) and
+       synthesize audio for each.
   - `state() -> dict` -- Return combined state: input buffer level, output buffer state, last phoneme played.
 
 - Function `create_pipeline(config: MavisConfig) -> MavisPipeline` -- Factory function.

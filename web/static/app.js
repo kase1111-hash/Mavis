@@ -4,6 +4,34 @@ let ws = null;
 let typedChars = [];
 let gameActive = false;
 let tickInterval = null;
+let audioCtx = null;
+let nextAudioTime = 0;
+
+// --- Audio playback (16-bit mono PCM streamed from the server) ---
+
+function playPcmChunk(b64, sampleRate) {
+    if (!audioCtx) return;
+    const raw = atob(b64);
+    const numSamples = Math.floor(raw.length / 2);
+    if (numSamples === 0) return;
+
+    const buffer = audioCtx.createBuffer(1, numSamples, sampleRate || 22050);
+    const channel = buffer.getChannelData(0);
+    for (let i = 0; i < numSamples; i++) {
+        // little-endian signed 16-bit -> float [-1, 1]
+        let sample = raw.charCodeAt(2 * i) | (raw.charCodeAt(2 * i + 1) << 8);
+        if (sample >= 0x8000) sample -= 0x10000;
+        channel[i] = sample / 32768;
+    }
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    // Schedule chunks back-to-back so consecutive phonemes are gapless
+    const startAt = Math.max(audioCtx.currentTime, nextAudioTime);
+    source.start(startAt);
+    nextAudioTime = startAt + buffer.duration;
+}
 
 // --- Screen management ---
 
@@ -75,6 +103,14 @@ function startGame(songId, title, sheetText) {
     typedChars = [];
     gameActive = true;
 
+    // Create the audio context inside the click handler (user gesture)
+    if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) audioCtx = new Ctx();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    nextAudioTime = 0;
+
     // Connect WebSocket
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${location.host}/ws/play`);
@@ -91,6 +127,7 @@ function startGame(songId, title, sheetText) {
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         if (msg.type === 'state') {
+            if (msg.audio) playPcmChunk(msg.audio, msg.sample_rate);
             updateGameDisplay(msg);
         } else if (msg.type === 'result') {
             showResults(msg);
