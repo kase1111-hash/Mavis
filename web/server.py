@@ -6,6 +6,7 @@ Run with:
     python -m web.server
 """
 
+import asyncio
 import base64
 import json
 import logging
@@ -138,6 +139,16 @@ def _default_tts_backend() -> str:
     return "espeak" if shutil.which("espeak-ng") else "mock"
 
 
+def _default_llm_backend() -> str:
+    """Prefer real G2P via espeak-ng when the binary is present.
+
+    The "claude" and "llama" backends are opt-in (MAVIS_LLM_BACKEND) since
+    they need an API key or a local model file.
+    """
+    import shutil
+    return "espeak" if shutil.which("espeak-ng") else "mock"
+
+
 class GameSession:
     """A per-client game session holding the pipeline and scoring state."""
 
@@ -145,7 +156,9 @@ class GameSession:
         self.session_id = str(uuid.uuid4())[:8]
         self.config = MavisConfig(
             hardware=LAPTOP_CPU,
-            llm_backend="mock",
+            # Real G2P when espeak-ng is installed; MAVIS_LLM_BACKEND
+            # overrides (e.g. "claude" for API-based conversion, "mock").
+            llm_backend=os.environ.get("MAVIS_LLM_BACKEND", _default_llm_backend()),
             # Real speech when espeak-ng is installed; MAVIS_TTS_BACKEND=mock
             # forces the sine-wave synthesizer.
             tts_backend=os.environ.get("MAVIS_TTS_BACKEND", _default_tts_backend()),
@@ -275,6 +288,15 @@ async def websocket_play(websocket: WebSocket):
                         if s.song_id == song_id:
                             session.song = s
                             break
+
+                # Network-backed G2P (claude): resolve the whole song's
+                # vocabulary in one batch call up front so gameplay ticks
+                # never wait on the API.
+                if session.song is not None and hasattr(session.pipeline.llm, "prewarm"):
+                    words = [t.text for t in session.song.tokens]
+                    await asyncio.get_event_loop().run_in_executor(
+                        None, session.pipeline.llm.prewarm, words
+                    )
 
                 _sessions[session.session_id] = session
                 await websocket.send_json({

@@ -78,8 +78,8 @@ class MockAudioSynthesizer(AudioSynthesizer):
 _ARPABET_TO_KIRSHENBAUM = {
     # vowels
     "aa": "A:", "ae": "a", "ah": "V", "ao": "O:", "aw": "aU", "ax": "@",
-    "ay": "aI", "eh": "E", "er": "3:", "ih": "I", "iy": "i:", "ow": "oU",
-    "oy": "OI", "uh": "U", "uw": "u:",
+    "ay": "aI", "eh": "E", "er": "3:", "ey": "eI", "ih": "I", "iy": "i:",
+    "ow": "oU", "oy": "OI", "uh": "U", "uw": "u:",
     # consonants
     "b": "b@", "ch": "tS", "d": "d@", "dh": "D", "f": "f", "g": "g@",
     "hh": "h", "jh": "dZ@", "k": "k", "l": "l", "m": "m", "n": "n",

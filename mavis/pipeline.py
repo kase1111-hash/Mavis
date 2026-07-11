@@ -9,6 +9,9 @@ from mavis.difficulty import DifficultySettings, get_difficulty
 from mavis.export import PerformanceRecording
 from mavis.input_buffer import InputBuffer
 from mavis.llm_processor import (
+    ClaudeLLMProcessor,
+    EspeakPhonemeProcessor,
+    LlamaLLMProcessor,
     LLMProcessor,
     MockLLMProcessor,
     PhonemeEvent,
@@ -56,7 +59,7 @@ class MavisPipeline:
             )
         else:
             self.output_buffer = OutputBuffer(capacity=output_cap)
-        self.llm: LLMProcessor = _create_llm(config.llm_backend)
+        self.llm: LLMProcessor = _create_llm(config)
         self.audio: AudioSynthesizer = _create_audio(config.tts_backend)
 
         self._last_tokens: List[SheetTextToken] = []
@@ -217,9 +220,18 @@ class MavisPipeline:
         return audio
 
 
-def _create_llm(backend: str) -> LLMProcessor:
+def _create_llm(config: MavisConfig) -> LLMProcessor:
+    backend = config.llm_backend
     if backend == "mock":
         return MockLLMProcessor()
+    if backend == "espeak":
+        return EspeakPhonemeProcessor()
+    if backend == "claude":
+        return ClaudeLLMProcessor(model=config.claude_model)
+    if backend == "llama":
+        if not config.llama_model_path:
+            raise ValueError("llm_backend='llama' requires config.llama_model_path")
+        return LlamaLLMProcessor(config.llama_model_path)
     raise ValueError(f"Unknown LLM backend: {backend!r}")
 
 

@@ -28,8 +28,10 @@ class MavisConfig:
     hardware: HardwareProfile = field(default_factory=lambda: LAPTOP_CPU)
     input_buffer_capacity: int = 256
     output_buffer_capacity: int = 32
-    llm_backend: str = "mock"  # "mock" | "llama" | "claude"
+    llm_backend: str = "mock"  # "mock" | "espeak" | "claude" | "llama"
     tts_backend: str = "mock"  # "mock" | "espeak" | "coqui" | "elevenlabs"
+    llama_model_path: Optional[str] = None  # GGUF model path for llm_backend="llama"
+    claude_model: str = "claude-opus-4-8"  # model ID for llm_backend="claude"
     difficulty_name: Optional[str] = None  # if set, overrides buffer sizes from difficulty
     voice_name: Optional[str] = None  # if set, applies voice profile to synthesis
     # Phonemes sung (drained from the output buffer) per second of real time,
