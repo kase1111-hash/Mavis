@@ -30,13 +30,16 @@ def status_color(status: str) -> str:
 
 RESET = "\033[0m"
 
-DEMO_TEXT = "the SUN... is falling _down_ and RISING [again]"
+DEMO_LINE = "the SUN... is falling _down_ and RISING [again]"
+# Repeat the line so the run is long enough to climb out of underflow
+# and settle in the optimal zone.
+DEMO_TEXT = " ".join([DEMO_LINE] * 3)
 
 
 def main():
     print("=" * 60)
     print("  Mavis Pipeline Demo")
-    print("  Sheet Text: " + repr(DEMO_TEXT))
+    print("  Sheet Text: " + repr(DEMO_LINE) + " (x3)")
     print("=" * 60)
     print()
 
@@ -47,19 +50,25 @@ def main():
     # Simulate typing at ~60 WPM (1 char every 200ms, 5 chars/word)
     char_delay = 0.15
 
-    # Feed all characters with a simulated delay
+    # Feed all characters with a simulated delay. Like a real player, the
+    # simulated typist watches the output buffer and pauses when it runs
+    # high -- buffer management is the game.
     chars_fed = 0
     total = len(DEMO_TEXT)
+    index = 0
 
     print(f"Simulating typing at ~60 WPM ({total} characters)...\n")
 
-    for char in DEMO_TEXT:
-        mods = {"shift": char.isupper(), "ctrl": False, "alt": False}
-        pipe.feed(char, mods)
-        chars_fed += 1
+    while index < total:
+        if pipe.output_buffer.state().level <= 0.7:
+            char = DEMO_TEXT[index]
+            index += 1
+            mods = {"shift": char.isupper(), "ctrl": False, "alt": False}
+            pipe.feed(char, mods)
+            chars_fed += 1
 
-        # Tick the pipeline
-        state = pipe.tick()
+        # Tick the pipeline by the same real time we sleep below
+        state = pipe.tick(elapsed_ms=int(char_delay * 1000))
         buf_state = pipe.output_buffer.state()
         tracker.on_tick(buf_state)
 
@@ -83,13 +92,11 @@ def main():
 
         time.sleep(char_delay)
 
-    # Drain remaining output buffer
+    # Drain remaining output buffer (performance is over -- no more scoring)
     print("\n\n  Draining output buffer...")
     drain_ticks = 0
     while pipe.output_buffer.size() > 0 and drain_ticks < 200:
-        state = pipe.tick()
-        buf_state = pipe.output_buffer.state()
-        tracker.on_tick(buf_state)
+        state = pipe.tick(elapsed_ms=50)
         drain_ticks += 1
 
         out_bar = bar(state["output_buffer_level"])

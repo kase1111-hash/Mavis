@@ -7,7 +7,7 @@ optimal = smooth output, overflow = pitch strain.
 import time
 from collections import deque
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Deque, List, Optional
 
 from mavis.llm_processor import PhonemeEvent
 
@@ -40,7 +40,7 @@ class OutputBuffer:
         self.capacity = capacity
         self.low_threshold = low_threshold
         self.high_threshold = high_threshold
-        self._buffer: deque = deque()
+        self._buffer: Deque[PhonemeEvent] = deque()
         self._push_times: List[float] = []
         self._pop_times: List[float] = []
         self._rate_window_s = 2.0

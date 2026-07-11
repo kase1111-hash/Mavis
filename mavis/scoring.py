@@ -1,11 +1,12 @@
 """Scoring system -- tracks performance quality based on buffer management and accuracy."""
 
-from typing import List, Optional
+from typing import Dict, Optional
 
+from mavis.difficulty import DifficultySettings
 from mavis.output_buffer import BufferState
 from mavis.sheet_text import SheetTextToken
 
-# Points per tick by buffer status
+# Default points per tick by buffer status (matches the Medium difficulty)
 _TICK_POINTS = {
     "optimal": 10,
     "underflow": -5,
@@ -26,21 +27,43 @@ class ScoreTracker:
     """Track performance quality during a Mavis session.
 
     Points are awarded per tick for time in the optimal buffer zone
-    and per token for matching expected Sheet Text markup.
+    and per token for matching expected Sheet Text markup. Point values
+    default to the Medium difficulty; pass ``tick_points`` and
+    ``token_bonus_multiplier`` (or use ``from_difficulty``) to customize.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        tick_points: Optional[Dict[str, int]] = None,
+        token_bonus_multiplier: float = 1.0,
+    ):
+        self._tick_points = dict(_TICK_POINTS)
+        if tick_points:
+            self._tick_points.update(tick_points)
+        self._token_bonus_multiplier = token_bonus_multiplier
         self._score: int = 0
         self._ticks: int = 0
         self._max_possible: int = 0
         self._token_matches: int = 0
         self._token_total: int = 0
 
+    @classmethod
+    def from_difficulty(cls, settings: DifficultySettings) -> "ScoreTracker":
+        """Build a tracker using a difficulty preset's point values."""
+        return cls(
+            tick_points={
+                "optimal": settings.tick_points_optimal,
+                "underflow": settings.tick_points_underflow,
+                "overflow": settings.tick_points_overflow,
+            },
+            token_bonus_multiplier=settings.token_bonus_multiplier,
+        )
+
     def on_tick(self, buffer_state: BufferState) -> None:
         """Called each frame with the current output buffer state."""
         self._ticks += 1
-        self._max_possible += _TICK_POINTS["optimal"]
-        self._score += _TICK_POINTS.get(buffer_state.status, 0)
+        self._max_possible += self._tick_points["optimal"]
+        self._score += self._tick_points.get(buffer_state.status, 0)
 
     def on_token(
         self,
@@ -77,7 +100,7 @@ class ScoreTracker:
         if matches == checks:
             self._token_matches += 1
 
-        self._score += bonus
+        self._score += int(bonus * self._token_bonus_multiplier)
 
     def score(self) -> int:
         """Current total score (can be negative)."""

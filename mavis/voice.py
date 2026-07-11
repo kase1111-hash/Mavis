@@ -2,8 +2,8 @@
 
 import json
 import os
-from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -115,7 +115,7 @@ def save_voice_preference(voice_name: str, path: Optional[str] = None) -> None:
     if path is None:
         path = os.path.join(os.path.expanduser("~"), ".mavis", "voice.json")
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    data = {"selected_voice": voice_name}
+    data: Dict[str, Any] = {"selected_voice": voice_name}
     # Also save any custom voice if it's not a preset
     voice = VOICES.get(voice_name.lower())
     if voice is not None:
@@ -135,4 +135,4 @@ def load_voice_preference(path: Optional[str] = None) -> str:
         return "default"
     with open(path, "r") as f:
         data = json.load(f)
-    return data.get("selected_voice", "default")
+    return str(data.get("selected_voice", "default"))

@@ -36,10 +36,13 @@ class DifficultySettings:
 
 
 # Predefined difficulty presets
+# Output buffer capacities are small on purpose: at ~100ms of audio per
+# phoneme the buffer holds only a few seconds of singing, so the optimal
+# zone is reachable within seconds of typing and overflow is a real threat.
 EASY = DifficultySettings(
     name="Easy",
     input_buffer_capacity=512,
-    output_buffer_capacity=256,
+    output_buffer_capacity=48,
     optimal_zone_low=0.1,
     optimal_zone_high=0.9,
     tick_points_optimal=10,
@@ -53,7 +56,7 @@ EASY = DifficultySettings(
 MEDIUM = DifficultySettings(
     name="Medium",
     input_buffer_capacity=256,
-    output_buffer_capacity=128,
+    output_buffer_capacity=24,
     optimal_zone_low=0.2,
     optimal_zone_high=0.8,
     tick_points_optimal=10,
@@ -67,7 +70,7 @@ MEDIUM = DifficultySettings(
 HARD = DifficultySettings(
     name="Hard",
     input_buffer_capacity=128,
-    output_buffer_capacity=64,
+    output_buffer_capacity=16,
     optimal_zone_low=0.3,
     optimal_zone_high=0.7,
     tick_points_optimal=15,
@@ -81,7 +84,7 @@ HARD = DifficultySettings(
 EXPERT = DifficultySettings(
     name="Expert",
     input_buffer_capacity=64,
-    output_buffer_capacity=32,
+    output_buffer_capacity=12,
     optimal_zone_low=0.35,
     optimal_zone_high=0.65,
     tick_points_optimal=20,

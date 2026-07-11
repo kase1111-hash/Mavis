@@ -128,7 +128,7 @@ This means:
 
 ## Current Status: Alpha (Core Instrument)
 
-This repo contains a **focused alpha implementation** of the core instrument with mock LLM/TTS backends. 170 tests passing.
+This repo contains a **focused alpha implementation** of the core instrument with mock LLM/TTS backends. 178 tests passing.
 
 ### What Works
 - ✅ Full pipeline (input buffer, sheet text parser, LLM processor, output buffer, audio synthesis)

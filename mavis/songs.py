@@ -3,7 +3,7 @@
 import json
 import os
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 from mavis.sheet_text import SheetTextToken
 
@@ -50,7 +50,7 @@ def load_song(path: str) -> Song:
 
 def list_songs(directory: str) -> List[Song]:
     """List all songs in a directory."""
-    songs = []
+    songs: List[Song] = []
     if not os.path.isdir(directory):
         return songs
     for filename in sorted(os.listdir(directory)):

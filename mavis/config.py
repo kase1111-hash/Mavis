@@ -27,8 +27,13 @@ class MavisConfig:
 
     hardware: HardwareProfile = field(default_factory=lambda: LAPTOP_CPU)
     input_buffer_capacity: int = 256
-    output_buffer_capacity: int = 128
+    output_buffer_capacity: int = 32
     llm_backend: str = "mock"  # "mock" | "llama" | "claude"
     tts_backend: str = "mock"  # "mock" | "espeak" | "coqui" | "elevenlabs"
     difficulty_name: Optional[str] = None  # if set, overrides buffer sizes from difficulty
     voice_name: Optional[str] = None  # if set, applies voice profile to synthesis
+    # Phonemes sung (drained from the output buffer) per second of real time,
+    # before the difficulty's drain_rate_multiplier is applied. Calibrated so a
+    # typist producing ~0.7 phonemes per character can outpace the drain at
+    # normal typing speed but falls behind when they stop.
+    base_drain_rate: float = 3.0

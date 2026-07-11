@@ -48,11 +48,14 @@ class MavisPipeline:
         self.input_buffer = InputBuffer(capacity=input_cap)
 
         # Build output buffer with difficulty-specific thresholds
-        ob_kwargs = {"capacity": output_cap}
         if self.difficulty is not None:
-            ob_kwargs["low_threshold"] = self.difficulty.optimal_zone_low
-            ob_kwargs["high_threshold"] = self.difficulty.optimal_zone_high
-        self.output_buffer = OutputBuffer(**ob_kwargs)
+            self.output_buffer = OutputBuffer(
+                capacity=output_cap,
+                low_threshold=self.difficulty.optimal_zone_low,
+                high_threshold=self.difficulty.optimal_zone_high,
+            )
+        else:
+            self.output_buffer = OutputBuffer(capacity=output_cap)
         self.llm: LLMProcessor = _create_llm(config.llm_backend)
         self.audio: AudioSynthesizer = _create_audio(config.tts_backend)
 
@@ -62,6 +65,17 @@ class MavisPipeline:
 
         # How many input chars to consume per tick
         self._chunk_size = 8
+
+        # Drain is time-based: phonemes are "sung" at a fixed rate per second
+        # of real time regardless of tick frequency, so buffer management
+        # stays winnable at human typing speed at any frame rate.
+        multiplier = 1.0
+        if self.difficulty is not None:
+            multiplier = self.difficulty.drain_rate_multiplier
+        self.drain_rate: float = config.base_drain_rate * multiplier
+        self._drain_accum: float = 0.0
+        self._popped_last_tick: int = 0
+        self._pending_audio: List[bytes] = []
 
         # Optional performance recording (for Prosody-Protocol export)
         self.recording: Optional[PerformanceRecording] = None
@@ -111,13 +125,13 @@ class MavisPipeline:
             self.feed(c, mods)
 
     def tick(self, elapsed_ms: int = 33) -> Dict:
-        """Advance the pipeline by one frame.
+        """Advance the pipeline by ``elapsed_ms`` of real time.
 
         1. Consume a chunk from the input buffer.
         2. Parse into Sheet Text tokens.
         3. Process tokens through the LLM for phoneme events.
         4. Push phoneme events into the output buffer.
-        5. Pop one event and synthesize audio.
+        5. Drain events at ``drain_rate`` phonemes/sec and synthesize audio.
 
         Returns the current pipeline state dict.
         """
@@ -146,15 +160,25 @@ class MavisPipeline:
         if events:
             self.output_buffer.push(events)
 
-        # Step 5: Pop and synthesize
-        self._last_phoneme = self.output_buffer.pop()
-        if self._last_phoneme is not None:
-            self._last_audio = self.audio.synthesize(self._last_phoneme)
+        # Step 5: Drain and synthesize at drain_rate phonemes per second.
+        # Cap elapsed time so a stalled caller (e.g. a throttled browser tab)
+        # cannot dump a burst of drains in one tick.
+        self._drain_accum += self.drain_rate * min(elapsed_ms, 1000) / 1000.0
+        to_pop = int(self._drain_accum)
+        self._drain_accum -= to_pop
+
+        self._popped_last_tick = 0
+        for _ in range(to_pop):
+            event = self.output_buffer.pop()
+            if event is None:
+                break
+            self._popped_last_tick += 1
+            self._last_phoneme = event
+            self._last_audio = self.audio.synthesize(event)
             self.audio.play(self._last_audio)
+            self._pending_audio.append(self._last_audio)
             if self.recording is not None:
-                self.recording.record_phoneme(self._elapsed_ms(), self._last_phoneme)
-        else:
-            self._last_audio = None
+                self.recording.record_phoneme(self._elapsed_ms(), event)
 
         # Record buffer state
         if self.recording is not None:
@@ -177,7 +201,20 @@ class MavisPipeline:
             "output_fill_rate": buf_state.fill_rate,
             "last_tokens": [t.text for t in self._last_tokens],
             "last_phoneme": self._last_phoneme.phoneme if self._last_phoneme else None,
+            "phonemes_popped": self._popped_last_tick,
         }
+
+    def take_audio(self) -> bytes:
+        """Return PCM audio synthesized since the last call and clear it.
+
+        Concatenated 16-bit mono PCM at mavis.audio.SAMPLE_RATE, suitable
+        for streaming to a client for playback.
+        """
+        if not self._pending_audio:
+            return b""
+        audio = b"".join(self._pending_audio)
+        self._pending_audio.clear()
+        return audio
 
 
 def _create_llm(backend: str) -> LLMProcessor:

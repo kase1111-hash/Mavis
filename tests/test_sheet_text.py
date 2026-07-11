@@ -1,6 +1,6 @@
 """Tests for mavis.sheet_text."""
 
-from mavis.sheet_text import SheetTextToken, parse, text_to_chars
+from mavis.sheet_text import parse, text_to_chars
 
 
 def test_plain_text():

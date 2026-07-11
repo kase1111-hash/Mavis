@@ -46,7 +46,7 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │       ├── test_researcher_api.py
 │       ├── test_intent_bridge.py
 │       └── test_export_phase4.py
-├── tests/                        # pytest test suite (170 tests)
+├── tests/                        # pytest test suite (178 tests)
 │   ├── test_input_buffer.py
 │   ├── test_sheet_text.py
 │   ├── test_config.py
@@ -99,7 +99,8 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 ### Difficulty System (`mavis/difficulty.py`)
 - `DifficultySettings` dataclass with buffer capacities, zone thresholds, point values, drain rate multipliers.
 - 4 presets: Easy (wide zone, gentle penalties), Medium (standard), Hard (narrow zone, harsh penalties), Expert (razor-thin zone).
-- Pipeline auto-applies difficulty: adjusts input/output buffer capacities and optimal zone thresholds.
+- Pipeline auto-applies difficulty: adjusts input/output buffer capacities, optimal zone thresholds, and drain rate (`base_drain_rate` x `drain_rate_multiplier`).
+- `ScoreTracker.from_difficulty(settings)` applies the preset's tick point values and token bonus multiplier.
 - `get_difficulty(name)` and `list_difficulties()` for lookup.
 
 ### Song Browser (`mavis/song_browser.py`)
@@ -217,7 +218,7 @@ Install with `pip install prosody-protocol` or `pip install mavis[prosody]`. Whe
 - **Web**: FastAPI + WebSocket (real-time gameplay), static HTML/JS frontend
 - **Interface**: curses (working terminal demo with menus)
 - **Data format**: Prosody-Protocol IML 1.0 (XML) + dataset-entry JSON schema
-- **Testing**: pytest (170 tests passing)
+- **Testing**: pytest (178 tests passing)
 
 ## Development Commands
 
@@ -284,7 +285,7 @@ uvicorn web.server:app --reload --port 8000
 - Sheet Text parser uses a two-pass approach: first pass groups chars into words and detects markup, second pass promotes consecutive "loud" tokens to "shout".
 - `MockLLMProcessor` uses a hardcoded English-to-phoneme dictionary (~50 words) with emphasis-to-prosody mapping.
 - `OutputBuffer` tracks fill/drain rates over a 2-second sliding window for real-time status display. Supports custom low/high thresholds for difficulty integration.
-- `MavisPipeline.tick()` runs the full cycle: consume input -> parse -> LLM -> apply voice profile -> buffer -> synthesize. When recording is active, every event is timestamped and stored in the `PerformanceRecording`.
+- `MavisPipeline.tick(elapsed_ms)` runs the full cycle: consume input -> parse -> LLM -> apply voice profile -> buffer -> synthesize. Draining is time-based: phonemes are sung at `drain_rate` phonemes per second of elapsed time (default 3.0/s scaled by the difficulty's `drain_rate_multiplier`), so buffer management stays winnable at human typing speed regardless of tick frequency. Synthesized PCM accumulates until `take_audio()` is called (the web server streams it to the browser as base64 over the WebSocket). When recording is active, every event is timestamped and stored in the `PerformanceRecording`.
 - `MavisPipeline.__init__()` reads `config.difficulty_name` and `config.voice_name` to auto-apply difficulty settings (buffer capacities, zone thresholds) and voice profile (pitch scaling, breathiness).
 - `mavis/export.py` maps Mavis data to Prosody-Protocol IML without requiring the `prosody_protocol` SDK at runtime, but produces output the SDK can validate.
 - `Leaderboard` persists to `~/.mavis/leaderboards.json` and auto-sorts/trims entries per song.

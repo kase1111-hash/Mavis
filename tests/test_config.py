@@ -5,7 +5,6 @@ from mavis.config import (
     DESKTOP_GPU,
     LAPTOP_CPU,
     SERVER_GPU,
-    HardwareProfile,
     MavisConfig,
 )
 
@@ -23,7 +22,8 @@ def test_default_config():
     assert cfg.llm_backend == "mock"
     assert cfg.tts_backend == "mock"
     assert cfg.input_buffer_capacity == 256
-    assert cfg.output_buffer_capacity == 128
+    assert cfg.output_buffer_capacity == 32
+    assert cfg.base_drain_rate == 3.0
 
 
 def test_custom_config():

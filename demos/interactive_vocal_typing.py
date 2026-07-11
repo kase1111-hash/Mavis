@@ -20,21 +20,17 @@ import time
 sys.path.insert(0, ".")
 
 from mavis.config import LAPTOP_CPU, MavisConfig
-from mavis.difficulty import DIFFICULTY_PRESETS, DifficultySettings, list_difficulties
-from mavis.leaderboard import Leaderboard, LeaderboardEntry, get_default_leaderboard
-from mavis.output_buffer import BufferState
+from mavis.difficulty import DIFFICULTY_PRESETS
+from mavis.leaderboard import LeaderboardEntry, get_default_leaderboard
 from mavis.pipeline import create_pipeline
 from mavis.scoring import ScoreTracker
-from mavis.song_browser import browse_songs, format_song_list, group_by_difficulty
-from mavis.songs import Song, load_song, list_songs
+from mavis.song_browser import browse_songs
+from mavis.songs import Song, load_song
 from mavis.tutorial import (
     LESSONS,
-    TutorialLesson,
     TutorialProgress,
-    format_lesson_list,
-    get_lesson,
 )
-from mavis.voice import VOICES, VoiceProfile, get_voice, list_voices
+from mavis.voice import VOICES
 
 # Sustain bar config
 SUSTAIN_MAX_WIDTH = 30
@@ -291,7 +287,10 @@ def play_game(stdscr, song, difficulty_name="medium", voice_name="default"):
         voice_name=voice_name,
     )
     pipe = create_pipeline(config)
-    tracker = ScoreTracker()
+    if pipe.difficulty is not None:
+        tracker = ScoreTracker.from_difficulty(pipe.difficulty)
+    else:
+        tracker = ScoreTracker()
 
     typed_text = []
     phonemes_played = []
@@ -307,6 +306,7 @@ def play_game(stdscr, song, difficulty_name="medium", voice_name="default"):
 
     running = True
     frame = 0
+    last_frame_time = time.monotonic()
 
     while running:
         frame += 1
@@ -360,13 +360,18 @@ def play_game(stdscr, song, difficulty_name="medium", voice_name="default"):
         if sustain_active and sustain_start:
             sustain_hold_ms = (time.monotonic() - sustain_start) * 1000
 
-        # Tick the pipeline
-        state = pipe.tick()
-        buf_state = pipe.output_buffer.state()
-        tracker.on_tick(buf_state)
+        # Tick the pipeline by the real time since the last frame
+        now = time.monotonic()
+        elapsed_ms = int((now - last_frame_time) * 1000)
+        last_frame_time = now
+        state = pipe.tick(elapsed_ms=elapsed_ms)
 
-        if state["last_phoneme"]:
-            phonemes_played.append(state["last_phoneme"])
+        # Don't penalize the empty buffer before the player starts typing
+        if typed_text:
+            tracker.on_tick(pipe.output_buffer.state())
+
+        if state["phonemes_popped"] and state["last_phoneme"]:
+            phonemes_played.extend([state["last_phoneme"]] * state["phonemes_popped"])
 
         # Song text display
         row = 3
@@ -547,7 +552,6 @@ def main(stdscr):
             lesson = tutorial_menu(stdscr)
             if lesson is not None:
                 # Create a pseudo-Song from the lesson
-                from mavis.sheet_text import SheetTextToken
                 pseudo_song = Song(
                     title=f"Tutorial {lesson.lesson_id}: {lesson.title}",
                     bpm=90,

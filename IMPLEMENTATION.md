@@ -77,7 +77,7 @@ Middleware:
 
 ## Testing Strategy
 
-- **170 tests** across 17 test files.
+- **178 tests** across 17 test files.
 - Domain mock objects (`MockLLMProcessor`, `MockAudioSynthesizer`) instead of `unittest.mock`.
 - Persistence tests use `tempfile` with `try/finally` cleanup.
 - Shared fixtures in `tests/conftest.py`.
