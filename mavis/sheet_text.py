@@ -38,7 +38,7 @@ def parse(chars: List[Dict]) -> List[SheetTextToken]:
 
     for ch in chars:
         c = ch["char"]
-        if c == " ":
+        if c.isspace():
             if current:
                 groups.append(current)
                 current = []

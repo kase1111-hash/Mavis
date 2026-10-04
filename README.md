@@ -128,7 +128,7 @@ This means:
 
 ## Current Status: Alpha (Core Instrument)
 
-This repo contains a **focused alpha implementation** of the core instrument with real grapheme-to-phoneme conversion and speech synthesis via espeak-ng (with mock fallbacks), plus optional Claude API and llama-cpp G2P backends. 204 tests passing.
+This repo contains a **focused alpha implementation** of the core instrument with real grapheme-to-phoneme conversion and speech synthesis via espeak-ng (with mock fallbacks), plus optional Claude API and llama-cpp G2P backends. 209 tests passing.
 
 ### What Works
 - ✅ Full pipeline (input buffer, sheet text parser, LLM processor, output buffer, audio synthesis)

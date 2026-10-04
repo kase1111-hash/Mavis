@@ -104,3 +104,8 @@ def test_text_to_chars_shift_detection():
     chars = text_to_chars("aB")
     assert chars[0]["shift"] is False
     assert chars[1]["shift"] is True
+
+
+def test_newline_separates_words():
+    tokens = parse(text_to_chars("star\nhow"))
+    assert [t.text for t in tokens] == ["star", "how"]
