@@ -46,7 +46,7 @@ Mavis is a vocal typing instrument that converts keyboard input with prosody mar
 │       ├── test_researcher_api.py
 │       ├── test_intent_bridge.py
 │       └── test_export_phase4.py
-├── tests/                        # pytest test suite (204 tests)
+├── tests/                        # pytest test suite (209 tests)
 │   ├── test_input_buffer.py
 │   ├── test_sheet_text.py
 │   ├── test_config.py
@@ -219,7 +219,7 @@ Install with `pip install prosody-protocol` or `pip install mavis[prosody]`. Whe
 - **Web**: FastAPI + WebSocket (real-time gameplay), static HTML/JS frontend
 - **Interface**: curses (working terminal demo with menus)
 - **Data format**: Prosody-Protocol IML 1.0 (XML) + dataset-entry JSON schema
-- **Testing**: pytest (204 tests passing)
+- **Testing**: pytest (209 tests passing)
 
 ## Development Commands
 
@@ -286,7 +286,7 @@ uvicorn web.server:app --reload --port 8000
 - Sheet Text parser uses a two-pass approach: first pass groups chars into words and detects markup, second pass promotes consecutive "loud" tokens to "shout".
 - All phoneme processors share `WordPhonemeProcessor` (word -> phonemes + emphasis-to-prosody mapping). `EspeakPhonemeProcessor` shells out to `espeak-ng -x` and maps Kirshenbaum symbols back to the ARPAbet inventory (`VALID_PHONEMES`); `ClaudeLLMProcessor`/`LlamaLLMProcessor` batch all uncached words into one structured-output request per process() call, validate the response against `VALID_PHONEMES`, and fall back to local G2P on any failure. `MockLLMProcessor` keeps the hardcoded ~50-word dictionary.
 - `OutputBuffer` tracks fill/drain rates over a 2-second sliding window for real-time status display. Supports custom low/high thresholds for difficulty integration.
-- `MavisPipeline.tick(elapsed_ms)` runs the full cycle: consume input -> parse -> LLM -> apply voice profile -> buffer -> synthesize. Draining is time-based: phonemes are sung at `drain_rate` phonemes per second of elapsed time (default 3.0/s scaled by the difficulty's `drain_rate_multiplier`), so buffer management stays winnable at human typing speed regardless of tick frequency. Synthesized PCM accumulates until `take_audio()` is called (the web server streams it to the browser as base64 over the WebSocket). When recording is active, every event is timestamped and stored in the `PerformanceRecording`.
+- `MavisPipeline.tick(elapsed_ms)` runs the full cycle: consume input -> parse -> LLM -> apply voice profile -> buffer -> synthesize. Only complete words (ended by whitespace) are parsed, so live typing is sung word by word rather than letter by letter; a trailing run of loud words is held until the run ends (2+ loud words become a shout), and anything pending is released after a `WORD_IDLE_FLUSH_MS` typing pause or by `flush()`. Draining is time-based: phonemes are sung at `drain_rate` phonemes per second of elapsed time (default 2.5/s scaled by the difficulty's `drain_rate_multiplier`), so buffer management stays winnable at human typing speed regardless of tick frequency. Synthesized PCM accumulates until `take_audio()` is called (the web server streams it to the browser as base64 over the WebSocket). When recording is active, every event is timestamped and stored in the `PerformanceRecording`.
 - `MavisPipeline.__init__()` reads `config.difficulty_name` and `config.voice_name` to auto-apply difficulty settings (buffer capacities, zone thresholds) and voice profile (pitch scaling, breathiness).
 - `mavis/export.py` maps Mavis data to Prosody-Protocol IML without requiring the `prosody_protocol` SDK at runtime, but produces output the SDK can validate.
 - `Leaderboard` persists to `~/.mavis/leaderboards.json` and auto-sorts/trims entries per song.

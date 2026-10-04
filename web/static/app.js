@@ -6,6 +6,8 @@ let gameActive = false;
 let tickInterval = null;
 let audioCtx = null;
 let nextAudioTime = 0;
+let currentGame = null;  // { songId, difficulty } of the game being played
+let endingGame = false;  // 'stop' sent, waiting for the server's result
 
 // --- Audio playback (16-bit mono PCM streamed from the server) ---
 
@@ -102,6 +104,7 @@ function startGame(songId, title, sheetText) {
     document.getElementById('game-grade').textContent = 'F';
     typedChars = [];
     gameActive = true;
+    currentGame = { songId: songId, difficulty: difficulty };
 
     // Create the audio context inside the click handler (user gesture)
     if (!audioCtx) {
@@ -130,12 +133,14 @@ function startGame(songId, title, sheetText) {
             if (msg.audio) playPcmChunk(msg.audio, msg.sample_rate);
             updateGameDisplay(msg);
         } else if (msg.type === 'result') {
-            showResults(msg);
+            finishGame(msg);
         }
     };
 
     ws.onclose = () => {
         gameActive = false;
+        // Connection lost before the server sent the result
+        if (endingGame) finishGame(null);
     };
 
     // Start idle tick interval (~30fps)
@@ -150,19 +155,83 @@ function startGame(songId, title, sheetText) {
     document.addEventListener('keyup', handleKeyUp);
 }
 
-function stopGame() {
+function stopInput() {
     gameActive = false;
     if (tickInterval) {
         clearInterval(tickInterval);
         tickInterval = null;
     }
+    document.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('keyup', handleKeyUp);
+}
+
+// Abandon the game without showing results.
+function stopGame() {
+    stopInput();
+    endingGame = false;
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'stop' }));
         ws.close();
     }
     ws = null;
-    document.removeEventListener('keydown', handleKeyDown);
-    document.removeEventListener('keyup', handleKeyUp);
+}
+
+// End the performance; the server answers 'stop' with the final result.
+function endPerformance() {
+    if (!gameActive) return;
+    stopInput();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        endingGame = true;
+        ws.send(JSON.stringify({ type: 'stop' }));
+    } else {
+        finishGame(null);
+    }
+}
+
+// Show the result (or the last displayed score if the server never sent
+// one) and submit it to the leaderboard.
+function finishGame(result) {
+    endingGame = false;
+    if (ws) {
+        ws.close();
+        ws = null;
+    }
+    if (!result) {
+        result = {
+            score: parseInt(document.getElementById('game-score').textContent),
+            grade: document.getElementById('game-grade').textContent,
+            chars_typed: typedChars.length,
+        };
+    }
+    showResults(result);
+    submitScore(result);
+}
+
+async function submitScore(result) {
+    const game = currentGame;
+    currentGame = null;
+    if (!game || !(result.score > 0)) return;
+    const name = document.getElementById('player-name').value.trim() || 'Player';
+    try {
+        const resp = await fetch(`/api/leaderboard/${encodeURIComponent(game.songId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                player_name: name,
+                score: result.score,
+                grade: result.grade,
+                difficulty: game.difficulty,
+            }),
+        });
+        const data = await resp.json();
+        if (data.rank > 0) {
+            const note = document.createElement('div');
+            note.textContent = `Leaderboard rank: #${data.rank}`;
+            document.getElementById('results-content').appendChild(note);
+        }
+    } catch (e) {
+        // Leaderboard submission is best-effort
+    }
 }
 
 function handleKeyDown(e) {
@@ -170,13 +239,7 @@ function handleKeyDown(e) {
 
     // Esc to stop
     if (e.key === 'Escape') {
-        stopGame();
-        showResults({
-            score: parseInt(document.getElementById('game-score').textContent),
-            grade: document.getElementById('game-grade').textContent,
-            phonemes_played: 0,
-            chars_typed: typedChars.length,
-        });
+        endPerformance();
         return;
     }
 
@@ -254,6 +317,12 @@ function showResults(result) {
 
 // --- Leaderboard ---
 
+function escapeHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = String(value);
+    return div.innerHTML;
+}
+
 async function showLeaderboard() {
     showScreen('leaderboard-screen');
     const resp = await fetch('/api/songs');
@@ -271,9 +340,9 @@ async function showLeaderboard() {
             lb.scores.forEach((entry, i) => {
                 html += `<div class="lb-entry">
                     <span class="lb-rank">${i + 1}.</span>
-                    <span class="lb-name">${entry.player_name || '???'}</span>
-                    <span class="lb-score">${entry.score}</span>
-                    <span class="lb-grade">[${entry.grade}]</span>
+                    <span class="lb-name">${escapeHtml(entry.player_name || '???')}</span>
+                    <span class="lb-score">${escapeHtml(entry.score)}</span>
+                    <span class="lb-grade">[${escapeHtml(entry.grade)}]</span>
                 </div>`;
             });
             html += '</div>';

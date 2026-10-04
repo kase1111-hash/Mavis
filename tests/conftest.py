@@ -78,3 +78,9 @@ def tmp_dir():
     yield d
     import shutil
     shutil.rmtree(d, ignore_errors=True)
+
+
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path, monkeypatch):
+    """Keep tests from writing to the real ~/.mavis (leaderboards, voice prefs)."""
+    monkeypatch.setenv("HOME", str(tmp_path))

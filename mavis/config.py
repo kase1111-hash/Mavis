@@ -36,6 +36,7 @@ class MavisConfig:
     voice_name: Optional[str] = None  # if set, applies voice profile to synthesis
     # Phonemes sung (drained from the output buffer) per second of real time,
     # before the difficulty's drain_rate_multiplier is applied. Calibrated so a
-    # typist producing ~0.7 phonemes per character can outpace the drain at
-    # normal typing speed but falls behind when they stop.
-    base_drain_rate: float = 3.0
+    # typist can outpace the drain at normal typing speed but falls behind
+    # when they stop: whole-word G2P yields ~0.57 phonemes per typed character
+    # across the song library, so break-even on Medium is ~4.4 chars/sec.
+    base_drain_rate: float = 2.5

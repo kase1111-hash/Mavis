@@ -20,6 +20,10 @@ from mavis.output_buffer import OutputBuffer
 from mavis.sheet_text import SheetTextToken, parse
 from mavis.voice import VoiceProfile, get_voice
 
+# A partial word is sent to the parser anyway once the typist has paused this
+# long, so the last word of a line is sung without a trailing space.
+WORD_IDLE_FLUSH_MS = 1000
+
 
 class MavisPipeline:
     """End-to-end pipeline: InputBuffer -> Parser -> LLM -> OutputBuffer -> Audio.
@@ -68,6 +72,12 @@ class MavisPipeline:
 
         # How many input chars to consume per tick
         self._chunk_size = 8
+
+        # Consumed chars waiting for their word to be complete. Parsing
+        # whatever happened to be consumed would split words mid-typing and
+        # sing them letter by letter.
+        self._pending_chars: List[Dict] = []
+        self._pending_idle_ms: int = 0
 
         # Drain is time-based: phonemes are "sung" at a fixed rate per second
         # of real time regardless of tick frequency, so buffer management
@@ -131,37 +141,20 @@ class MavisPipeline:
         """Advance the pipeline by ``elapsed_ms`` of real time.
 
         1. Consume a chunk from the input buffer.
-        2. Parse into Sheet Text tokens.
+        2. Parse the words completed so far into Sheet Text tokens.
         3. Process tokens through the LLM for phoneme events.
         4. Push phoneme events into the output buffer.
         5. Drain events at ``drain_rate`` phonemes/sec and synthesize audio.
 
         Returns the current pipeline state dict.
         """
-        # Step 1: Consume input
-        chars = self.input_buffer.consume(self._chunk_size)
+        # Step 1: Consume input, keeping only complete words
+        chars = self._complete_words(
+            self.input_buffer.consume(self._chunk_size), elapsed_ms
+        )
 
-        # Step 2: Parse
-        tokens = parse(chars) if chars else []
-        if tokens:
-            self._last_tokens = tokens
-            if self.recording is not None:
-                now = self._elapsed_ms()
-                for tok in tokens:
-                    self.recording.record_token(now, tok)
-
-        # Step 3: LLM processing
-        events: List[PhonemeEvent] = []
-        if tokens:
-            events = self.llm.process(tokens)
-
-        # Step 3.5: Apply voice profile to phoneme events
-        if events and self.voice is not None:
-            events = [_apply_voice(ev, self.voice) for ev in events]
-
-        # Step 4: Push to output buffer
-        if events:
-            self.output_buffer.push(events)
+        # Steps 2-4: Parse, LLM, voice, push to output buffer
+        self._process(chars)
 
         # Step 5: Drain and synthesize at drain_rate phonemes per second.
         # Cap elapsed time so a stalled caller (e.g. a throttled browser tab)
@@ -190,6 +183,68 @@ class MavisPipeline:
             )
 
         return self.state()
+
+    def flush(self) -> None:
+        """Process everything typed so far, including an unfinished last word.
+
+        Call at the end of a performance so a final word typed without a
+        trailing space is still sung.
+        """
+        chars = self._pending_chars + self.input_buffer.consume(self.input_buffer.size())
+        self._pending_chars = []
+        self._pending_idle_ms = 0
+        self._process(chars)
+
+    def _complete_words(self, chars: List[Dict], elapsed_ms: int) -> List[Dict]:
+        """Queue newly consumed chars and return those ready to be parsed.
+
+        Text is ready up to the end of the last complete word, except that a
+        trailing run of loud words is held back until the run ends, since a
+        run of 2+ loud words is sung as a shout. Everything is released once
+        the typist pauses for ``WORD_IDLE_FLUSH_MS``.
+        """
+        pending = self._pending_chars
+        pending.extend(chars)
+        self._pending_idle_ms = 0 if chars else self._pending_idle_ms + elapsed_ms
+
+        if (
+            self._pending_idle_ms >= WORD_IDLE_FLUSH_MS
+            or len(pending) >= self.input_buffer.capacity
+        ):
+            cut = len(pending)
+        else:
+            cut = 0
+            word_start = 0
+            for i, ch in enumerate(pending):
+                if not ch["char"].isspace():
+                    continue
+                word = pending[word_start:i]
+                word_start = i + 1
+                if not word:
+                    continue
+                word_tokens = parse(word)
+                if not word_tokens or word_tokens[-1].emphasis != "loud":
+                    cut = i + 1
+
+        self._pending_chars = pending[cut:]
+        return pending[:cut]
+
+    def _process(self, chars: List[Dict]) -> None:
+        """Parse chars into tokens, convert to phonemes, and queue them."""
+        tokens = parse(chars) if chars else []
+        if not tokens:
+            return
+        self._last_tokens = tokens
+        if self.recording is not None:
+            now = self._elapsed_ms()
+            for tok in tokens:
+                self.recording.record_token(now, tok)
+
+        events = self.llm.process(tokens)
+        if self.voice is not None:
+            events = [_apply_voice(ev, self.voice) for ev in events]
+        if events:
+            self.output_buffer.push(events)
 
     def state(self) -> Dict:
         """Return combined pipeline state."""

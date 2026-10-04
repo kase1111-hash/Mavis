@@ -33,13 +33,13 @@ RESET = "\033[0m"
 DEMO_LINE = "the SUN... is falling _down_ and RISING [again]"
 # Repeat the line so the run is long enough to climb out of underflow
 # and settle in the optimal zone.
-DEMO_TEXT = " ".join([DEMO_LINE] * 3)
+DEMO_TEXT = " ".join([DEMO_LINE] * 4)
 
 
 def main():
     print("=" * 60)
     print("  Mavis Pipeline Demo")
-    print("  Sheet Text: " + repr(DEMO_LINE) + " (x3)")
+    print("  Sheet Text: " + repr(DEMO_LINE) + " (x4)")
     print("=" * 60)
     print()
 
@@ -51,8 +51,8 @@ def main():
     char_delay = 0.15
 
     # Feed all characters with a simulated delay. Like a real player, the
-    # simulated typist watches the output buffer and pauses when it runs
-    # high -- buffer management is the game.
+    # simulated typist watches the output buffer and pauses between words
+    # when it runs high -- buffer management is the game.
     chars_fed = 0
     total = len(DEMO_TEXT)
     index = 0
@@ -60,7 +60,8 @@ def main():
     print(f"Simulating typing at ~60 WPM ({total} characters)...\n")
 
     while index < total:
-        if pipe.output_buffer.state().level <= 0.7:
+        mid_word = index > 0 and DEMO_TEXT[index - 1] != " "
+        if mid_word or pipe.output_buffer.state().level <= 0.7:
             char = DEMO_TEXT[index]
             index += 1
             mods = {"shift": char.isupper(), "ctrl": False, "alt": False}
@@ -94,6 +95,7 @@ def main():
 
     # Drain remaining output buffer (performance is over -- no more scoring)
     print("\n\n  Draining output buffer...")
+    pipe.flush()  # sing the last word, typed without a trailing space
     drain_ticks = 0
     while pipe.output_buffer.size() > 0 and drain_ticks < 200:
         state = pipe.tick(elapsed_ms=50)

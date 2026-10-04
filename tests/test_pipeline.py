@@ -144,3 +144,69 @@ def test_game_is_winnable_at_human_typing_speed():
     assert optimal_ticks / scored_ticks > 0.5
     assert tracker.score() > 0
     assert tracker.grade() != "F"
+
+
+def _type_live(pipe, text):
+    """Type one key at a time with a short tick after each, like a player."""
+    for c in text:
+        pipe.feed(c, {"shift": c.isupper(), "ctrl": False, "alt": False})
+        pipe.tick(elapsed_ms=150)
+
+
+def test_live_typing_sings_whole_words():
+    """Regression test: keys typed one per tick must reach the phoneme
+    processor as whole words, not as single letters."""
+    pipe = create_pipeline()
+    rec = pipe.start_recording()
+    _type_live(pipe, "twinkle LITTLE star [again] _down_ SUN... is ")
+    tokens = [(t.text, t.emphasis) for t in rec.tokens]
+    assert tokens == [
+        ("twinkle", "none"),
+        ("LITTLE", "loud"),
+        ("star", "none"),
+        ("again", "none"),
+        ("down", "soft"),
+        ("SUN", "loud"),
+        ("is", "none"),
+    ]
+    assert rec.tokens[3].harmony
+    assert rec.tokens[5].sustain
+
+
+def test_live_typing_run_of_loud_words_is_shout():
+    pipe = create_pipeline()
+    rec = pipe.start_recording()
+    _type_live(pipe, "I SAID STOP now ")
+    assert [(t.text, t.emphasis) for t in rec.tokens] == [
+        ("I", "shout"),
+        ("SAID", "shout"),
+        ("STOP", "shout"),
+        ("now", "none"),
+    ]
+
+
+def test_unfinished_word_is_sung_after_a_pause():
+    from mavis.pipeline import WORD_IDLE_FLUSH_MS
+
+    pipe = create_pipeline()
+    rec = pipe.start_recording()
+    for c in "little star":
+        pipe.feed(c)
+        pipe.tick(elapsed_ms=0)
+    assert [t.text for t in rec.tokens] == ["little"]
+
+    pipe.tick(elapsed_ms=WORD_IDLE_FLUSH_MS - 1)
+    assert [t.text for t in rec.tokens] == ["little"]
+    pipe.tick(elapsed_ms=1)
+    assert [t.text for t in rec.tokens] == ["little", "star"]
+
+
+def test_flush_processes_unfinished_word():
+    pipe = create_pipeline()
+    rec = pipe.start_recording()
+    pipe.feed_text("hello world")
+    pipe.tick(elapsed_ms=0)
+    assert [t.text for t in rec.tokens] == ["hello"]
+    pipe.flush()
+    assert [t.text for t in rec.tokens] == ["hello", "world"]
+    assert pipe.output_buffer.size() > 0

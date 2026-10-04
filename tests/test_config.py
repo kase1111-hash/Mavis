@@ -23,7 +23,7 @@ def test_default_config():
     assert cfg.tts_backend == "mock"
     assert cfg.input_buffer_capacity == 256
     assert cfg.output_buffer_capacity == 32
-    assert cfg.base_drain_rate == 3.0
+    assert cfg.base_drain_rate == 2.5
 
 
 def test_custom_config():
