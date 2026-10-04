@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=64", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "mavis"
@@ -14,12 +14,25 @@ authors = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "ruff", "mypy"]
+dev = [
+    "pytest>=7.0",
+    "ruff",
+    "mypy",
+    # TestClient: older starlette needs httpx, newer prefers httpx2 (Python 3.10+)
+    "httpx",
+    "httpx2; python_version >= '3.10'",
+]
 llm-local = ["llama-cpp-python"]
 llm-cloud = ["anthropic"]
 tts-coqui = ["TTS"]
 web = ["fastapi", "uvicorn", "websockets"]
 prosody = ["prosody-protocol"]
+
+[tool.setuptools.packages.find]
+include = ["mavis*", "web*"]
+
+[tool.setuptools.package-data]
+web = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -28,6 +41,10 @@ addopts = "-v"
 [tool.ruff]
 target-version = "py38"
 line-length = 100
+
+[tool.ruff.lint]
+# Pin the rule set so newer ruff releases (which widen the defaults) don't break CI.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.mypy]
 python_version = "3.8"
